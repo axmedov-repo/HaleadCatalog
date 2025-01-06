@@ -1,8 +1,12 @@
 package com.halead.catalog.utils
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalContext
 
 fun findMinOffset(polygonPoints: List<Offset>): Offset {
     val minX = polygonPoints.minOfOrNull { it.x } ?: 0f
@@ -39,4 +43,22 @@ fun getRegionSize(regionPoints: List<Offset>): Size {
 
 fun resizeBitmap(bitmap: Bitmap, width: Int, height: Int): Bitmap {
     return Bitmap.createScaledBitmap(bitmap, width, height, true)
+}
+
+@Composable
+fun getAspectRatioFromResource(resourceId: Int): Float {
+    val context = LocalContext.current
+
+    // Use remember to avoid recalculating on recomposition
+    return remember(resourceId) {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true // Only decode the dimensions
+        }
+        BitmapFactory.decodeResource(context.resources, resourceId, options)
+        if (options.outWidth > 0 && options.outHeight > 0) {
+            options.outWidth.toFloat() / options.outHeight.toFloat()
+        } else {
+            1f // Default aspect ratio if dimensions are invalid
+        }
+    }
 }
