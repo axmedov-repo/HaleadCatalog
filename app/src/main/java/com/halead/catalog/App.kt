@@ -1,6 +1,8 @@
 package com.halead.catalog
 
 import android.app.Application
+import android.util.Log
+import org.opencv.android.OpenCVLoader
 
 class App : Application() {
     companion object {
@@ -11,5 +13,11 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        // Initialize OpenCV
+        if (!OpenCVLoader.initDebug()) {
+            Log.e("OpenCV", "OpenCV initialization failed")
+        } else {
+            Log.d("OpenCV", "OpenCV initialized successfully")
+        }
     }
 }

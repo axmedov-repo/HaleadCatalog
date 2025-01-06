@@ -1,7 +1,6 @@
 package com.halead.catalog
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
@@ -17,25 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.halead.catalog.ui.theme.HaleadCatalogTheme
-import org.opencv.android.OpenCVLoader
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!OpenCVLoader.initDebug()) {
-            Log.e("OpenCV", "OpenCV initialization failed.")
-        } else {
-            Log.d("OpenCV", "OpenCV initialization succeeded.")
-        }
-
         setContent {
             HaleadCatalogTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    MainScreen()
-                }
+                AppScreen()
             }
         }
     }
@@ -43,14 +30,19 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
-    Column {
-        TopAppBar(
-            title = { Text(text = "Halead Catalog") },
-            modifier = Modifier.padding(0.dp),
-            colors = androidx.compose.material3.TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.White)
-        )
+fun AppScreen() {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column {
+            TopAppBar(
+                title = { Text(text = "Halead Catalog") },
+                modifier = Modifier.padding(0.dp),
+                colors = androidx.compose.material3.TopAppBarDefaults.smallTopAppBarColors(containerColor = Color.LightGray)
+            )
 
-        ImageEditorScreen()
+            MainScreen()
+        }
     }
 }
