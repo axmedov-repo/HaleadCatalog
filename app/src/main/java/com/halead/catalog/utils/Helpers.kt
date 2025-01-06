@@ -1,13 +1,15 @@
 package com.halead.catalog.utils
 
+import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 
-fun findMinOffset(points: List<Offset>): Offset {
-    val minX = points.minOfOrNull { it.x } ?: 0f
-    val minY = points.minOfOrNull { it.y } ?: 0f
+fun findMinOffset(polygonPoints: List<Offset>): Offset {
+    val minX = polygonPoints.minOfOrNull { it.x } ?: 0f
+    val minY = polygonPoints.minOfOrNull { it.y } ?: 0f
     return Offset(minX, minY)
 }
+
 
 fun getRegionSize(regionPoints: List<Offset>): Size {
     if (regionPoints.isEmpty()) {
@@ -33,4 +35,8 @@ fun getRegionSize(regionPoints: List<Offset>): Size {
     val height = maxY - minY
 
     return Size(width, height)
+}
+
+fun resizeBitmap(bitmap: Bitmap, width: Int, height: Int): Bitmap {
+    return Bitmap.createScaledBitmap(bitmap, width, height, true)
 }

@@ -3,6 +3,7 @@ package com.halead.catalog
 import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,16 +35,17 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.halead.catalog.data.OverlayMaterial
 import com.halead.catalog.data.materials
-import com.halead.catalog.utils.drawMaterialOnPolygon
 import com.halead.catalog.utils.findMinOffset
 import com.halead.catalog.utils.getBitmapFromResource
+import com.halead.catalog.utils.getClippedMaterial
 import com.halead.catalog.utils.getRegionSize
+import com.halead.catalog.utils.resizeBitmap
 
 @Composable
 fun ImageEditor(
@@ -83,11 +87,9 @@ fun ImageEditor(
 //                materialBitmap = selectedMaterialBmp?.asAndroidBitmap()
 //            ).asImageBitmap()
 
-            // TODO: I need to make Overlay myself
-            val appliedMaterialBitmap = drawMaterialOnPolygon(
-                imageBitmap.asAndroidBitmap(),
-                selectedMaterialBmp!!.asAndroidBitmap(),
-                polygonPoints
+            val appliedMaterialBitmap = getClippedMaterial(
+                materialBitmap = resizeBitmap(selectedMaterialBmp!!.asAndroidBitmap(), 1024, 1024),
+                regionPoints = polygonPoints
             )
 
             val offsetOfOverlay = findMinOffset(polygonPoints)
@@ -103,40 +105,27 @@ fun ImageEditor(
 
             polygonPoints = emptyList()
             isMaterialApplied = true
-            Log.d("REGION", "LaunchedEffect 2")
-
-//            if (updatedImageBitmap != imageBitmap) {
-//                Log.d("REGION", "LaunchedEffect 2")
-//                isMaterialApplied = true
-//                imageBitmap = updatedImageBitmap
-//            }
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        if (materials.containsValue(selectedMaterial)) {
-            Image(
-                painter = painterResource(selectedMaterial),
-                contentDescription = null,
-                modifier = Modifier
-                    .padding(16.dp)
-                    .size(160.dp, 80.dp)
-            )
-        }
-
+    Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
+                .wrapContentWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center
         ) {
             // Base Image
             Image(
                 bitmap = imageBitmap,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize()
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.wrapContentSize().background(Color.Red)
             )
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier.matchParentSize()
+            ) {
                 // Draw overlays
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     overlays.forEach { overlay ->
@@ -148,24 +137,11 @@ fun ImageEditor(
 //                            Log.d("REGION", "Drawing Overlay materialBitmap=${overlay.materialBitmap}")
 //                        }
                         Log.d("REGION", "Drawing Overlay materialBitmap=${overlay.materialBitmap.asImageBitmap()}")
-                        drawImage(overlay.materialBitmap.asImageBitmap())
+                        Log.d("REGION", "Overlay pos=${overlay.position}")
+
+                        drawImage(overlay.materialBitmap.asImageBitmap(), topLeft = overlay.position)
                     }
                 }
-//                if (overlays.isNotEmpty()) {
-//                    val overlay = overlays.first()
-//                    Log.d("REGION", "Drawing 2 Overlay materialBitmap=${overlay.materialBitmap.asImageBitmap()}")
-//                    val size = getRegionSize(overlay.regionPoints)
-//                    Image(
-//                        bitmap = overlay.materialBitmap.asImageBitmap(),
-//                        contentDescription = null,
-//                        modifier = Modifier
-//                            .size(
-//                                size.width.dp,
-//                                size.height.dp
-//                            )
-//                            .background(Color.Red)
-//                    )
-//                }
 
                 // Add gesture handling for overlays
                 overlays.forEachIndexed { index, overlay ->
@@ -191,7 +167,7 @@ fun ImageEditor(
             }
 
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.matchParentSize()
             ) {
                 // Draw Region
                 Canvas(modifier = Modifier
