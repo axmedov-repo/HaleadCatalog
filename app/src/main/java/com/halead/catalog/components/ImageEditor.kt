@@ -1,15 +1,16 @@
-package com.halead.catalog
+package com.halead.catalog.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,8 +33,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.halead.catalog.data.OverlayMaterial
-import com.halead.catalog.data.materials
+import com.halead.catalog.data.entity.OverlayMaterial
 import com.halead.catalog.utils.findMinOffset
 import com.halead.catalog.utils.getBitmapFromResource
 import com.halead.catalog.utils.getClippedMaterial
@@ -41,15 +41,17 @@ import com.halead.catalog.utils.resizeBitmap
 
 @Composable
 fun ImageEditor(
+    materials: Map<String, Int>,
     imageBitmap: ImageBitmap,
-    selectedMaterial: Int
+    selectedMaterial: Int?,
+    overlays : List<OverlayMaterial>,
+    onOverlayAdded :(OverlayMaterial) -> Unit
 ) {
     val context = LocalContext.current
-    val overlays = remember { mutableStateListOf<OverlayMaterial>() }
 
     val selectedMaterialBmp by remember(selectedMaterial) {
         mutableStateOf<ImageBitmap?>(
-            if (materials.containsValue(selectedMaterial)) {
+            if (selectedMaterial != null && materials.containsValue(selectedMaterial)) {
                 getBitmapFromResource(context, selectedMaterial)?.asImageBitmap()
             } else {
                 null
@@ -77,7 +79,7 @@ fun ImageEditor(
 
             val offsetOfOverlay = findMinOffset(polygonPoints)
 
-            overlays.add(
+            onOverlayAdded(
                 OverlayMaterial(
                     materialBitmap = appliedMaterialBitmap,
                     regionPoints = polygonPoints,
@@ -90,20 +92,24 @@ fun ImageEditor(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .padding(16.dp),
+                .weight(1f),
             contentAlignment = Alignment.Center
         ) {
             // Base image with aspect ratio scaling
             Box(
                 modifier = Modifier
                     .aspectRatio(aspectRatio) // Maintain aspect ratio
-                    .fillMaxWidth()
-                    .background(Color.Gray),
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -160,19 +166,12 @@ fun ImageEditor(
             }
         }
 
-        // Apply Material Button
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+        Button(
+            shape = RoundedCornerShape(8.dp),
+            enabled = selectedMaterialBmp != null,
+            onClick = { appliedMaterialsCount++ }
         ) {
-            Button(
-                enabled = selectedMaterialBmp != null,
-                onClick = { appliedMaterialsCount++ }
-            ) {
-                Text("Apply Material")
-            }
+            Text("Apply Material")
         }
     }
 }

@@ -1,4 +1,4 @@
-package com.halead.catalog.data
+package com.halead.catalog.data.entity
 
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
