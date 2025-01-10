@@ -1,5 +1,6 @@
 package com.halead.catalog.components
 
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -18,7 +19,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,7 +33,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.halead.catalog.data.entity.OverlayMaterial
+import com.halead.catalog.app.App
+import com.halead.catalog.data.models.OverlayMaterial
 import com.halead.catalog.utils.findMinOffset
 import com.halead.catalog.utils.getBitmapFromResource
 import com.halead.catalog.utils.getClippedMaterial
@@ -44,8 +45,8 @@ fun ImageEditor(
     materials: Map<String, Int>,
     imageBitmap: ImageBitmap,
     selectedMaterial: Int?,
-    overlays : List<OverlayMaterial>,
-    onOverlayAdded :(OverlayMaterial) -> Unit
+    overlays: List<OverlayMaterial>,
+    onOverlayAdded: (OverlayMaterial) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -89,6 +90,8 @@ fun ImageEditor(
 
             polygonPoints = emptyList()
             isMaterialApplied = true
+        } else {
+            Toast.makeText(App.instance, "Draw regions!", Toast.LENGTH_SHORT).show()
         }
     }
 

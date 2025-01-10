@@ -1,7 +1,6 @@
 package com.halead.catalog.screens
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -10,7 +9,11 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.halead.catalog.components.FunctionsMenu
 import com.halead.catalog.components.ImageSelector
@@ -22,13 +25,10 @@ fun MainScreen(
     mainViewModel: MainViewModel = viewModel<MainViewModelImpl>()
 ) {
     val mainUiState by mainViewModel.mainUiState.collectAsState()
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri -> mainViewModel.selectImage(uri) }
+    var showImagePickerDialog by remember { mutableStateOf(false) }
 
     Row(
-        modifier = Modifier
-            .fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         horizontalArrangement = Arrangement.Center
     ) {
         FunctionsMenu(
@@ -40,14 +40,12 @@ fun MainScreen(
             selectedCursor = mainUiState.currentCursor,
             onFunctionClicked = { function ->
                 if (function.type == FunctionsEnum.REPLACE_IMAGE) {
-                    launcher.launch("image/*")
+                    showImagePickerDialog = true
                 } else {
                     mainViewModel.selectFunction(function)
                 }
             },
-            onCursorClicked = { cursor ->
-                mainViewModel.selectCursor(cursor)
-            }
+            onCursorClicked = { mainViewModel.selectCursor(it) }
         )
 
         ImageSelector(
@@ -56,20 +54,22 @@ fun MainScreen(
                 .weight(8f),
             materials = mainUiState.materials,
             imageBmp = mainUiState.imageBmp,
+            showImagePicker = showImagePickerDialog,
             selectedMaterial = mainUiState.selectedMaterial,
             overlays = mainUiState.overlays,
+            changeImagePickerVisibility = { showImagePickerDialog = it },
             onOverlayAdded = { mainViewModel.addOverlay(it) }
         ) {
-            launcher.launch("image/*")
+            mainViewModel.selectImage(it)
         }
 
         MaterialsMenu(
             modifier = Modifier
                 .fillMaxHeight()
-                .weight(1f),
+                .weight(1f).background(Color.Red),
             materials = mainUiState.materials,
             selectedMaterial = mainUiState.selectedMaterial,
-            onMaterialSelected = { material -> mainViewModel.selectMaterial(material) }
+            onMaterialSelected = { mainViewModel.selectMaterial(it) }
         )
     }
 }

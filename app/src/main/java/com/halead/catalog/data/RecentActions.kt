@@ -1,8 +1,9 @@
 package com.halead.catalog.data
 
 import androidx.compose.ui.geometry.Offset
-import com.halead.catalog.data.entity.OverlayMaterial
+import com.halead.catalog.data.models.OverlayMaterial
 import com.halead.catalog.utils.UndoRedoManager
+import javax.inject.Singleton
 
 sealed interface RecentAction {
     //    data class UploadImage(val image: ImageBitmap) : RecentAction
@@ -10,6 +11,7 @@ sealed interface RecentAction {
     data class AddOverlayMaterial(val overlayMaterial: OverlayMaterial) : RecentAction
 }
 
+@Singleton
 class RecentActions {
     private val recentActions = UndoRedoManager<RecentAction>()
 

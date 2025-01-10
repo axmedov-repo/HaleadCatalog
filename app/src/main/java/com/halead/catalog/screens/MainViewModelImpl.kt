@@ -1,12 +1,13 @@
 package com.halead.catalog.screens
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import com.halead.catalog.app.App
 import com.halead.catalog.data.RecentAction
 import com.halead.catalog.data.RecentActions
-import com.halead.catalog.data.entity.OverlayMaterial
+import com.halead.catalog.data.models.OverlayMaterial
 import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.FunctionData
 import com.halead.catalog.data.enums.FunctionsEnum
@@ -41,9 +42,15 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
-    override fun selectImage(uri: Uri?) {
+    override fun selectImage(bitmap: Bitmap?) {
+        recentActions.clearAll()
         mainUiState.update {
-            it.copy(imageBmp = getBitmapFromUri(App.instance, uri)?.asImageBitmap(), overlays = emptyList())
+            it.copy(
+                imageBmp = bitmap?.asImageBitmap(),
+                overlays = emptyList(),
+                canUndo = recentActions.canUndo(),
+                canRedo = recentActions.canRedo()
+            )
         }
     }
 

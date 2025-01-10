@@ -2,7 +2,7 @@ package com.halead.catalog.data.states
 
 import androidx.compose.ui.graphics.ImageBitmap
 import com.halead.catalog.R
-import com.halead.catalog.data.entity.OverlayMaterial
+import com.halead.catalog.data.models.OverlayMaterial
 import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.CursorTypes
 
