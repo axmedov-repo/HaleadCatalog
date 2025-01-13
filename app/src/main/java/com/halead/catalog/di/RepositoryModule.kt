@@ -1,7 +1,9 @@
 package com.halead.catalog.di
 
-import com.halead.catalog.repository.MainRepository
-import com.halead.catalog.repository.MainRepositoryImpl
+import com.halead.catalog.repository.main.MainRepository
+import com.halead.catalog.repository.main.MainRepositoryImpl
+import com.halead.catalog.repository.work.WorkRepository
+import com.halead.catalog.repository.work.WorkRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -14,4 +16,8 @@ interface RepositoryModule {
     @Binds
     @Singleton
     fun getMainRepository(mainRepositoryImpl: MainRepositoryImpl): MainRepository
+
+    @Binds
+    @Singleton
+    fun getWorkRepository(workRepositoryImpl: WorkRepositoryImpl): WorkRepository
 }

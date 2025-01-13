@@ -37,4 +37,18 @@ class UndoRedoManager<T> {
         undoStack.clear()
         redoStack.clear()
     }
+
+    fun getUndoList() = undoStack.toList()
+
+    fun getRedoList() = redoStack.toList()
+
+    fun addAllUndoList(undoList: List<T>) {
+        undoStack.clear()
+        undoStack.addAll(undoList)
+    }
+
+    fun addAllRedoList(redoList: List<T>) {
+        redoStack.clear()
+        redoStack.addAll(redoList)
+    }
 }

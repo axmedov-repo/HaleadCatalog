@@ -1,4 +1,4 @@
-package com.halead.catalog.components
+package com.halead.catalog.screens.work
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -13,81 +13,84 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.halead.catalog.ui.theme.SelectedItemColor
-import com.halead.catalog.utils.getAspectRatioFromResource
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.halead.catalog.data.models.WorkModel
 
 @Composable
-fun MaterialsMenu(
-    materials: Map<String, Int>,
-    selectedMaterial: Int?,
+fun WorkHistoryPanel(
     modifier: Modifier = Modifier,
-    onMaterialSelected: (Int) -> Unit
+    workViewModel: WorkViewModel = viewModel<WorkViewModelImpl>(),
+    onWorkClick: (WorkModel) -> Unit = {}
 ) {
-    val materialsList by remember(materials) { mutableStateOf(materials.values) }
+    val uiState by workViewModel.uiState.collectAsState()
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.LightGray),
+        modifier = modifier.background(Color.LightGray),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-//        Text(text = "Materials", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.titleMedium)
+        Text(text = "History", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.titleMedium)
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp)
+            contentPadding = PaddingValues(16.dp)
         ) {
-            items(materialsList.toList()) { material ->
-                MenuItem(material, selectedMaterial, onMaterialSelected)
+            items(uiState.works) {
+                WorkHistoryItem(
+                    work = it,
+                    onClick = { onWorkClick(it) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun MenuItem(
-    material: Int,
-    selectedMaterial: Int?,
-    onMaterialSelected: (Int) -> Unit,
+fun WorkHistoryItem(
+    work: WorkModel,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    val aspectRatio = getAspectRatioFromResource(material)
+    val aspectRatio by remember(work.baseImage) {
+        derivedStateOf {
+            work.baseImage.width.toFloat() / work.baseImage.height.toFloat()
+        }
+    }
 
     Box(
         modifier = modifier
+            .width(200.dp)
             .aspectRatio(aspectRatio)
-            .border(
-                BorderStroke(
-                    4.dp,
-                    if (selectedMaterial == material) SelectedItemColor else Color.White
-                ), RoundedCornerShape(8.dp)
-            )
+            .border(BorderStroke(2.dp, Color.White), RoundedCornerShape(8.dp))
             .clickable(
-                onClick = { onMaterialSelected(material) },
+                onClick = onClick,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = Color.Red)
             )
-            .padding(4.dp)
+            .padding(2.dp)
     ) {
         Image(
             modifier = Modifier.fillMaxSize(),
+            bitmap = work.baseImage.asImageBitmap(),
             contentScale = ContentScale.Crop,
             contentDescription = null,
-            painter = painterResource(material)
         )
     }
 }

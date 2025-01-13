@@ -1,23 +1,17 @@
 package com.halead.catalog.utils
 
-import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.FileOutputStream
 
-fun findMinOffset(polygonPoints: List<Offset>): Offset {
-    val minX = polygonPoints.minOfOrNull { it.x } ?: 0f
-    val minY = polygonPoints.minOfOrNull { it.y } ?: 0f
+fun findMinOffset(regionPoints: List<Offset>): Offset {
+    val minX = regionPoints.minOf { it.x }
+    val minY = regionPoints.minOf { it.y }
     return Offset(minX, minY)
 }
-
 
 fun getRegionSize(regionPoints: List<Offset>): Size {
     if (regionPoints.isEmpty()) {
@@ -45,10 +39,6 @@ fun getRegionSize(regionPoints: List<Offset>): Size {
     return Size(width, height)
 }
 
-fun resizeBitmap(bitmap: Bitmap, width: Int, height: Int): Bitmap {
-    return Bitmap.createScaledBitmap(bitmap, width, height, true)
-}
-
 @Composable
 fun getAspectRatioFromResource(resourceId: Int): Float {
     val context = LocalContext.current
@@ -65,25 +55,4 @@ fun getAspectRatioFromResource(resourceId: Int): Float {
             1f // Default aspect ratio if dimensions are invalid
         }
     }
-}
-
-fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
-    val stream = ByteArrayOutputStream()
-    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream)
-    return stream.toByteArray()
-}
-
-fun byteArrayToBitmap(byteArray: ByteArray): Bitmap {
-    return BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
-}
-
-fun saveImageToFile(context: Context, bitmap: Bitmap, fileName: String): String {
-    val fileDir = context.filesDir
-    val file = File(fileDir, fileName)
-
-    FileOutputStream(file).use { fos ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
-    }
-
-    return file.absolutePath
 }

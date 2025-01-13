@@ -5,18 +5,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -42,27 +43,23 @@ fun FunctionsMenu(
     modifier: Modifier = Modifier,
     canUndo: Boolean,
     canRedo: Boolean,
+    baseImage: ImageBitmap?,
+    isOverlaysEmpty: Boolean = true,
     selectedCursor: CursorData? = null,
     onFunctionClicked: (FunctionData) -> Unit,
     onCursorClicked: (CursorData) -> Unit,
 ) {
-    Column(
+    Row(
         modifier = modifier
-            .fillMaxHeight()
-            .wrapContentWidth()
+            .fillMaxWidth()
+            .wrapContentHeight()
             .background(Color.LightGray),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start
     ) {
-        /*        Text(
-            text = "Functions",
-            modifier = Modifier.padding(8.dp),
-            style = MaterialTheme.typography.titleMedium
-        )*/
-
-        LazyColumn(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        LazyRow(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(16.dp)
         ) {
             items(functionsList) { functionData ->
@@ -70,13 +67,15 @@ fun FunctionsMenu(
                     data = functionData,
                     canUndo = canUndo,
                     canRedo = canRedo,
+                    isOverlaysEmpty = isOverlaysEmpty,
+                    baseImage = baseImage,
                     onFunctionClicked = { onFunctionClicked(functionData) }
                 )
             }
             item {
-                HorizontalDivider(
-                    Modifier.width(40.dp),
-                    thickness = 1.dp,
+                VerticalDivider(
+                    Modifier.height(40.dp),
+                    thickness = 2.dp,
                     color = Color.Gray
                 )
             }
@@ -84,6 +83,7 @@ fun FunctionsMenu(
                 CursorItem(
                     data = cursorData,
                     selectedData = selectedCursor,
+                    baseImage = baseImage,
                     onFunctionClicked = { onCursorClicked(cursorData) }
                 )
             }
@@ -96,12 +96,22 @@ fun FunctionItem(
     data: FunctionData,
     canUndo: Boolean,
     canRedo: Boolean,
+    isOverlaysEmpty: Boolean,
+    baseImage: ImageBitmap?,
     onFunctionClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val disabled by remember(data, canUndo, canRedo) {
+    val disabled by remember(
+        data.type, canUndo, canRedo, isOverlaysEmpty, baseImage
+    ) {
         derivedStateOf {
-            (!canRedo && data.type == FunctionsEnum.REDO) || (!canUndo && data.type == FunctionsEnum.UNDO)
+            when (data.type) {
+                FunctionsEnum.REDO -> !canRedo
+                FunctionsEnum.UNDO -> !canUndo
+                FunctionsEnum.REPLACE_IMAGE -> baseImage == null
+                FunctionsEnum.CLEAR_LAYERS -> isOverlaysEmpty
+                else -> false
+            }
         }
     }
 
@@ -127,6 +137,7 @@ fun FunctionItem(
 fun CursorItem(
     data: CursorData,
     selectedData: CursorData?,
+    baseImage: ImageBitmap?,
     onFunctionClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -136,13 +147,14 @@ fun CursorItem(
             .aspectRatio(1f)
             .shadow(4.dp, RoundedCornerShape(8.dp))
             .clip(shape = RoundedCornerShape(8.dp))
-            .background(if (selectedData == data) SelectedItemColor else Color.Gray)
+            .background(if (selectedData == data && baseImage != null) SelectedItemColor else Color.Gray)
             .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp))
-            .clickable { onFunctionClicked() }
+            .clickable(enabled = baseImage != null) { onFunctionClicked() }
             .padding(8.dp),
         contentScale = ContentScale.Crop,
         contentDescription = null,
         colorFilter = ColorFilter.tint(Color.White),
-        painter = painterResource(data.img)
+        painter = painterResource(data.img),
+        alpha = if (baseImage == null) 0.4f else 1.0f
     )
 }
