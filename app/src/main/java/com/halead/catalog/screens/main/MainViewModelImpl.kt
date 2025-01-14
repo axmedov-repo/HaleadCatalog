@@ -3,7 +3,6 @@ package com.halead.catalog.screens.main
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,7 +16,6 @@ import com.halead.catalog.data.models.WorkModel
 import com.halead.catalog.data.states.MainUiState
 import com.halead.catalog.data.states.toTrackedState
 import com.halead.catalog.repository.main.MainRepository
-import com.halead.catalog.repository.work.WorkRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -29,7 +27,6 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModelImpl @Inject constructor(
     private val mainRepository: MainRepository,
-    private val workRepository: WorkRepository,
     private val recentActions: RecentActions
 ) : MainViewModel, ViewModel() {
     override val mainUiState = MutableStateFlow(MainUiState())
@@ -39,32 +36,33 @@ class MainViewModelImpl @Inject constructor(
         Log.d("RecentActionsLog", "init")
         viewModelScope.launch {
             getMaterials()
-            observeMaterialDependentChanges()
+            observeIsMaterialApplied()
         }
 
         viewModelScope.launch {
             saveCurrentState()
         }
-
-//        viewModelScope.launch {
-//            recentActions.setOnRecentActionsChanged {
-//                Log.d("RecentActionsLog", "Observing")
-//
-//            }
-//        }
-
     }
 
-    private suspend fun observeMaterialDependentChanges() {
+    private suspend fun observeIsMaterialApplied() {
         Log.d("RecentActionsLog", "observeMaterialDependentChanges")
         mainUiState
-            .map { state -> listOf(state.imageBmp, state.selectedMaterial, state.polygonPoints) }
+            .map { state ->
+                listOf(
+                    state.imageBmp, state.selectedMaterial, state.polygonPoints, state.overlays
+                )
+            }
             .distinctUntilChanged()
             .collect { _ ->
                 mainUiState.update {
-                    it.copy(isMaterialApplied = false)
+                    it.copy(isMaterialApplied = isMaterialApplied())
                 }
             }
+    }
+
+    private suspend fun isMaterialApplied(): Boolean {
+        val overlayPoints = mainUiState.value.overlays.flatMap { it.regionPoints }
+        return mainUiState.value.polygonPoints.all { it in overlayPoints }
     }
 
     private suspend fun saveCurrentState() {
@@ -93,11 +91,6 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-//        saveCurrentWork()
-    }
-
     private fun getMaterials() {
         mainUiState.update {
             it.copy(materials = mainRepository.getMaterials())
@@ -111,9 +104,7 @@ class MainViewModelImpl @Inject constructor(
     }
 
     override fun selectImage(bitmap: Bitmap?) {
-//        saveCurrentWork()
         viewModelScope.launch {
-//            recentActions.clearAll()
             isStateReacting = false
             mainUiState.update {
                 it.copy(
@@ -157,12 +148,10 @@ class MainViewModelImpl @Inject constructor(
 
     override fun addOverlay(overlayMaterial: OverlayMaterialModel) {
         viewModelScope.launch {
-//            recentActions.act(RecentAction.OverlayMaterial(overlayMaterial))
             isStateReacting = false
             mainUiState.update {
                 it.copy(
-                    overlays = it.overlays.plus(overlayMaterial),
-                    isMaterialApplied = true
+                    overlays = it.overlays.plus(overlayMaterial)
                 )
             }
         }
@@ -176,7 +165,6 @@ class MainViewModelImpl @Inject constructor(
                     polygonPoints = it.polygonPoints.plus(offset)
                 )
             }
-//            recentActions.act(RecentAction.PolygonPoints(mainUiState.value.polygonPoints))
         }
     }
 
@@ -216,91 +204,21 @@ class MainViewModelImpl @Inject constructor(
         isStateReacting = true
         Log.d("RecentActionsLog", "reAct recentAction=${recentAction}")
         when (recentAction) {
-            /* is RecentAction.OverlayMaterial -> {
-                 if (undo) {
-                     mainUiState.update {
-                         it.copy(
-                             overlays = it.overlays.minus(recentAction.overlayMaterial),
-                             canUndo = recentActions.canUndo(),
-                             canRedo = recentActions.canRedo()
-                         )
-                     }
-                 } else {
-                     mainUiState.update {
-                         it.copy(
-                             overlays = it.overlays.plus(recentAction.overlayMaterial),
-                             canUndo = recentActions.canUndo(),
-                             canRedo = recentActions.canRedo()
-                         )
-                     }
-                 }
-             }
-
-             is RecentAction.OverlayMaterialsList -> {
-                 if (undo) {
-                     mainUiState.update {
-                         it.copy(
-                             overlays = it.overlays.minus(recentAction.overlayMaterials.toSet()),
-                             canUndo = recentActions.canUndo(),
-                             canRedo = recentActions.canRedo()
-                         )
-                     }
-                 } else {
-                     mainUiState.update {
-                         it.copy(
-                             overlays = it.overlays.plus(recentAction.overlayMaterials.toSet()),
-                             canUndo = recentActions.canUndo(),
-                             canRedo = recentActions.canRedo()
-                         )
-                     }
-                 }
-             }
-
-             is RecentAction.PolygonPoints -> {
-                 mainUiState.update {
-                     it.copy(
-                         polygonPoints = recentAction.polygonPoints,
-                         canUndo = recentActions.canUndo(),
-                         canRedo = recentActions.canRedo()
-                     )
-                 }
-             }*/
-
             is RecentAction.UiState -> {
                 Log.d("RecentActionsLog", "reAct condition=${(mainUiState.value != recentAction.mainUiState)}")
                 mainUiState.value = recentAction.mainUiState
             }
 
             null -> {
-                mainUiState.update {
-                    it.copy(
-                        imageBmp = null,
-                        overlays = emptyList(),
-                        polygonPoints = emptyList(),
-                        isMaterialApplied = false
-                    )
+                if (undo) {
+                    mainUiState.update {
+                        it.copy(
+                            imageBmp = null,
+                            overlays = emptyList(),
+                            polygonPoints = emptyList()
+                        )
+                    }
                 }
-            }
-        }
-    }
-
-    private fun saveCurrentWork() {
-        viewModelScope.launch {
-            mainUiState.value.imageBmp?.let {
-                var resultBitmap: Bitmap = it.asAndroidBitmap()
-//                for (overlay in mainUiState.value.overlays) {
-//                    resultBitmap = getClippedMaterial(
-//                        materialBitmap = overlay.materialBitmap,
-//                        regionPoints = overlay.regionPoints
-//                    )
-//                }
-
-                workRepository.insert(
-                    WorkModel(
-                        baseImage = resultBitmap,
-                        overlays = mainUiState.value.overlays
-                    )
-                )
             }
         }
     }

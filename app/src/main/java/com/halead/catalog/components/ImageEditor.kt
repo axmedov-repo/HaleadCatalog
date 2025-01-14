@@ -153,11 +153,6 @@ fun ImageEditor(
                         }
 
                         CursorTypes.HAND -> {
-//                            detectTapGestures(onLongPress = { offset ->
-//                                selectedPointIndex = mainUiState.polygonPoints.indexOfFirst { point ->
-//                                    (offset - point).getDistance() <= 20f // 8f is the circle radius
-//                                }
-//                            })
                             detectDragGestures(
                                 onDragStart = { offset ->
                                     Log.d(
