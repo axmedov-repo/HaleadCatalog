@@ -3,44 +3,49 @@ package com.halead.catalog.utils
 import java.util.Stack
 
 class UndoRedoManager<T> {
-    private val undoStack = Stack<T>()
-    private val redoStack = Stack<T>()
+     val undoStack = Stack<T>()
+     val redoStack = Stack<T>()
+
+    var canUndo: Boolean = false
+        private set
+    var canRedo: Boolean = false
+        private set
 
     fun addState(state: T) {
         undoStack.push(state)
-        redoStack.clear()
+        redoStack.clear() // Clear redo stack when a new state is added
+        updateFlags()
     }
 
     fun undo(): T? {
-        if (undoStack.isNotEmpty()) {
-            val temp = undoStack.pop()
-            redoStack.push(temp)
-            return temp
+        if (canUndo) {
+            val currentState = undoStack.pop()
+            redoStack.push(currentState)
+            updateFlags()
+            return if (canUndo) undoStack.peek() else null
         }
         return null
     }
 
     fun redo(): T? {
-        if (redoStack.isNotEmpty()) {
-            val temp = redoStack.pop()
-            undoStack.push(temp)
-            return temp
+        if (canRedo) {
+            val redoState = redoStack.pop()
+            undoStack.push(redoState)
+            updateFlags()
+            return redoState
         }
         return null
     }
 
-    fun canUndo(): Boolean = undoStack.isNotEmpty()
-
-    fun canRedo(): Boolean = redoStack.isNotEmpty()
+    private fun updateFlags() {
+        canUndo = undoStack.isNotEmpty()
+        canRedo = redoStack.isNotEmpty()
+    }
 
     fun clearAll() {
         undoStack.clear()
         redoStack.clear()
     }
-
-    fun getUndoList() = undoStack.toList()
-
-    fun getRedoList() = redoStack.toList()
 
     fun addAllUndoList(undoList: List<T>) {
         undoStack.clear()

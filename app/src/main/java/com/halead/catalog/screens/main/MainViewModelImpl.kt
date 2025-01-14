@@ -1,6 +1,7 @@
 package com.halead.catalog.screens.main
 
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -14,6 +15,7 @@ import com.halead.catalog.data.enums.FunctionsEnum
 import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.data.models.WorkModel
 import com.halead.catalog.data.states.MainUiState
+import com.halead.catalog.data.states.toTrackedState
 import com.halead.catalog.repository.main.MainRepository
 import com.halead.catalog.repository.work.WorkRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,22 +33,63 @@ class MainViewModelImpl @Inject constructor(
     private val recentActions: RecentActions
 ) : MainViewModel, ViewModel() {
     override val mainUiState = MutableStateFlow(MainUiState())
+    private var isStateReacting = false
 
     init {
-        getMaterials()
-        observeMaterialDependentChanges()
+        Log.d("RecentActionsLog", "init")
+        viewModelScope.launch {
+            getMaterials()
+            observeMaterialDependentChanges()
+        }
+
+        viewModelScope.launch {
+            saveCurrentState()
+        }
+
+//        viewModelScope.launch {
+//            recentActions.setOnRecentActionsChanged {
+//                Log.d("RecentActionsLog", "Observing")
+//
+//            }
+//        }
+
     }
 
-    private fun observeMaterialDependentChanges() {
-        viewModelScope.launch {
-            mainUiState
-                .map { state -> listOf(state.imageBmp, state.selectedMaterial, state.polygonPoints) }
-                .distinctUntilChanged()
-                .collect { _ ->
-                    mainUiState.update {
-                        it.copy(isMaterialApplied = false)
-                    }
+    private suspend fun observeMaterialDependentChanges() {
+        Log.d("RecentActionsLog", "observeMaterialDependentChanges")
+        mainUiState
+            .map { state -> listOf(state.imageBmp, state.selectedMaterial, state.polygonPoints) }
+            .distinctUntilChanged()
+            .collect { _ ->
+                mainUiState.update {
+                    it.copy(isMaterialApplied = false)
                 }
+            }
+    }
+
+    private suspend fun saveCurrentState() {
+        Log.d("RecentActionsLog", "Sent to save")
+        mainUiState
+            .map { it.toTrackedState() }
+            .distinctUntilChanged()
+            .collect {
+                if (!isStateReacting && it.imageBmp != null) {
+                    recentActions.act(
+                        RecentAction.UiState(mainUiState.value)
+                    )
+                }
+                updateUndoRedo()
+            }
+    }
+
+    private fun updateUndoRedo() {
+        val newCanUndo = recentActions.canUndo()
+        val newCanRedo = recentActions.canRedo()
+
+        if (mainUiState.value.canUndo != newCanUndo || mainUiState.value.canRedo != newCanRedo) {
+            mainUiState.update {
+                it.copy(canUndo = newCanUndo, canRedo = newCanRedo)
+            }
         }
     }
 
@@ -69,38 +112,42 @@ class MainViewModelImpl @Inject constructor(
 
     override fun selectImage(bitmap: Bitmap?) {
 //        saveCurrentWork()
-        recentActions.clearAll()
-        mainUiState.update {
-            it.copy(
-                imageBmp = bitmap?.asImageBitmap(),
-                overlays = emptyList(),
-                canUndo = recentActions.canUndo(),
-                canRedo = recentActions.canRedo(),
-                polygonPoints = emptyList()
-            )
+        viewModelScope.launch {
+//            recentActions.clearAll()
+            isStateReacting = false
+            mainUiState.update {
+                it.copy(
+                    imageBmp = bitmap?.asImageBitmap(),
+                    overlays = emptyList(),
+                    polygonPoints = emptyList()
+                )
+            }
         }
     }
 
     override fun selectFunction(function: FunctionData) {
-        when (function.type) {
-            FunctionsEnum.UNDO -> {
-                reAct(recentActions.undo(), true)
-            }
-
-            FunctionsEnum.REDO -> {
-                reAct(recentActions.redo(), false)
-            }
-
-            FunctionsEnum.CLEAR_LAYERS -> {
-                mainUiState.update {
-                    it.copy(
-                        overlays = emptyList(),
-                        polygonPoints = emptyList()
-                    )
+        viewModelScope.launch {
+            when (function.type) {
+                FunctionsEnum.UNDO -> {
+                    reAct(recentActions.undo(), true)
                 }
-            }
 
-            else -> {}
+                FunctionsEnum.REDO -> {
+                    reAct(recentActions.redo(), false)
+                }
+
+                FunctionsEnum.CLEAR_LAYERS -> {
+                    isStateReacting = false
+                    mainUiState.update {
+                        it.copy(
+                            overlays = emptyList(),
+                            polygonPoints = emptyList()
+                        )
+                    }
+                }
+
+                else -> {}
+            }
         }
     }
 
@@ -110,12 +157,11 @@ class MainViewModelImpl @Inject constructor(
 
     override fun addOverlay(overlayMaterial: OverlayMaterialModel) {
         viewModelScope.launch {
-            recentActions.act(RecentAction.OverlayMaterial(overlayMaterial))
+//            recentActions.act(RecentAction.OverlayMaterial(overlayMaterial))
+            isStateReacting = false
             mainUiState.update {
                 it.copy(
                     overlays = it.overlays.plus(overlayMaterial),
-                    canUndo = recentActions.canUndo(),
-                    canRedo = recentActions.canRedo(),
                     isMaterialApplied = true
                 )
             }
@@ -124,18 +170,20 @@ class MainViewModelImpl @Inject constructor(
 
     override fun addPolygonPoint(offset: Offset) {
         viewModelScope.launch {
+            isStateReacting = false
             mainUiState.update {
                 it.copy(
                     polygonPoints = it.polygonPoints.plus(offset)
                 )
             }
-            recentActions.act(RecentAction.PolygonPoints(mainUiState.value.polygonPoints))
+//            recentActions.act(RecentAction.PolygonPoints(mainUiState.value.polygonPoints))
         }
     }
 
     override fun updatePolygonPoint(index: Int, offset: Offset) {
         viewModelScope.launch {
             if (index in mainUiState.value.polygonPoints.indices) {
+                isStateReacting = true
                 mainUiState.update {
                     it.copy(
                         overlays = emptyList(),
@@ -150,12 +198,14 @@ class MainViewModelImpl @Inject constructor(
 
     override fun memorizeUpdatedPolygonPoints() {
         viewModelScope.launch {
-            recentActions.act(RecentAction.PolygonPoints(mainUiState.value.polygonPoints))
+            isStateReacting = false
+            mainUiState.update { it.copy() }
         }
     }
 
     override fun clearPolygonPoints() {
         viewModelScope.launch {
+            isStateReacting = false
             mainUiState.update {
                 it.copy(polygonPoints = emptyList())
             }
@@ -163,58 +213,74 @@ class MainViewModelImpl @Inject constructor(
     }
 
     private fun reAct(recentAction: RecentAction?, undo: Boolean) {
+        isStateReacting = true
+        Log.d("RecentActionsLog", "reAct recentAction=${recentAction}")
         when (recentAction) {
-            is RecentAction.OverlayMaterial -> {
-                if (undo) {
-                    mainUiState.update {
-                        it.copy(
-                            overlays = it.overlays.minus(recentAction.overlayMaterial),
-                            canUndo = recentActions.canUndo(),
-                            canRedo = recentActions.canRedo()
-                        )
-                    }
-                } else {
-                    mainUiState.update {
-                        it.copy(
-                            overlays = it.overlays.plus(recentAction.overlayMaterial),
-                            canUndo = recentActions.canUndo(),
-                            canRedo = recentActions.canRedo()
-                        )
-                    }
-                }
+            /* is RecentAction.OverlayMaterial -> {
+                 if (undo) {
+                     mainUiState.update {
+                         it.copy(
+                             overlays = it.overlays.minus(recentAction.overlayMaterial),
+                             canUndo = recentActions.canUndo(),
+                             canRedo = recentActions.canRedo()
+                         )
+                     }
+                 } else {
+                     mainUiState.update {
+                         it.copy(
+                             overlays = it.overlays.plus(recentAction.overlayMaterial),
+                             canUndo = recentActions.canUndo(),
+                             canRedo = recentActions.canRedo()
+                         )
+                     }
+                 }
+             }
+
+             is RecentAction.OverlayMaterialsList -> {
+                 if (undo) {
+                     mainUiState.update {
+                         it.copy(
+                             overlays = it.overlays.minus(recentAction.overlayMaterials.toSet()),
+                             canUndo = recentActions.canUndo(),
+                             canRedo = recentActions.canRedo()
+                         )
+                     }
+                 } else {
+                     mainUiState.update {
+                         it.copy(
+                             overlays = it.overlays.plus(recentAction.overlayMaterials.toSet()),
+                             canUndo = recentActions.canUndo(),
+                             canRedo = recentActions.canRedo()
+                         )
+                     }
+                 }
+             }
+
+             is RecentAction.PolygonPoints -> {
+                 mainUiState.update {
+                     it.copy(
+                         polygonPoints = recentAction.polygonPoints,
+                         canUndo = recentActions.canUndo(),
+                         canRedo = recentActions.canRedo()
+                     )
+                 }
+             }*/
+
+            is RecentAction.UiState -> {
+                Log.d("RecentActionsLog", "reAct condition=${(mainUiState.value != recentAction.mainUiState)}")
+                mainUiState.value = recentAction.mainUiState
             }
 
-            is RecentAction.OverlayMaterialsList -> {
-                if (undo) {
-                    mainUiState.update {
-                        it.copy(
-                            overlays = it.overlays.minus(recentAction.overlayMaterials.toSet()),
-                            canUndo = recentActions.canUndo(),
-                            canRedo = recentActions.canRedo()
-                        )
-                    }
-                } else {
-                    mainUiState.update {
-                        it.copy(
-                            overlays = it.overlays.plus(recentAction.overlayMaterials.toSet()),
-                            canUndo = recentActions.canUndo(),
-                            canRedo = recentActions.canRedo()
-                        )
-                    }
-                }
-            }
-
-            is RecentAction.PolygonPoints -> {
+            null -> {
                 mainUiState.update {
                     it.copy(
-                        polygonPoints = recentAction.polygonPoints,
-                        canUndo = recentActions.canUndo(),
-                        canRedo = recentActions.canRedo()
+                        imageBmp = null,
+                        overlays = emptyList(),
+                        polygonPoints = emptyList(),
+                        isMaterialApplied = false
                     )
                 }
             }
-
-            null -> {}
         }
     }
 

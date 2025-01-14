@@ -12,6 +12,12 @@ data class CursorData(
     val type: CursorTypes
 )
 
+val DefaultCursorData = CursorData(
+    img = R.drawable.ic_draw,
+    text = "Draw",
+    type = CursorTypes.DRAW
+)
+
 val cursorTypesList = listOf(
     CursorData(
         img = R.drawable.ic_draw,

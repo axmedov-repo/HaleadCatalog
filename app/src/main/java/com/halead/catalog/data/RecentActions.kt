@@ -1,54 +1,77 @@
 package com.halead.catalog.data
 
-import androidx.compose.ui.geometry.Offset
-import com.halead.catalog.data.models.OverlayMaterialModel
+import android.util.Log
 import com.halead.catalog.data.states.MainUiState
 import com.halead.catalog.utils.UndoRedoManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Singleton
 
 sealed interface RecentAction {
-    //    data class UploadImage(val image: ImageBitmap) : RecentAction
-    data class PolygonPoints(val polygonPoints: List<Offset>) : RecentAction
-    data class OverlayMaterial(val overlayMaterial: OverlayMaterialModel) : RecentAction
-    data class OverlayMaterialsList(val overlayMaterials: List<OverlayMaterialModel>) : RecentAction
+    data class UiState(val mainUiState: MainUiState) : RecentAction
+//    data class UploadImage(val image: ImageBitmap) : RecentAction
+//    data class PolygonPoints(val polygonPoints: List<Offset>) : RecentAction
+//    data class OverlayMaterial(val overlayMaterial: OverlayMaterialModel) : RecentAction
+//    data class OverlayMaterialsList(val overlayMaterials: List<OverlayMaterialModel>) : RecentAction
 }
 
 @Singleton
 class RecentActions {
     private val recentActions = UndoRedoManager<RecentAction>()
 
-    /**
-     * Only positive actions need to be recorded
-     */
-    fun act(action: RecentAction) {
-        recentActions.addState(action)
+    private var onRecentActionsChanged: suspend () -> Unit = {}
+
+    suspend fun setOnRecentActionsChanged(listener: suspend () -> Unit) {
+        onRecentActionsChanged = listener
     }
 
-    fun undo(): RecentAction? {
-        return recentActions.undo()
+    suspend fun act(action: RecentAction) = withContext(Dispatchers.IO) {
+        Log.d("RecentActionsLog", "Acting=$action")
+        Log.d("RecentActionsLog", "isUndoStackEmpty=${recentActions.undoStack.isEmpty()}")
+        Log.d(
+            "RecentActionsLog",
+            "undoStack.peek=${if (!recentActions.undoStack.isEmpty()) recentActions.undoStack.peek() else ""}"
+        )
+        if (recentActions.undoStack.isEmpty() || recentActions.undoStack.peek() != action) {
+            Log.d("RecentActionsLog", "Acted")
+            recentActions.addState(action)
+            onRecentActionsChanged()
+        }
     }
 
-    fun redo(): RecentAction? {
-        return recentActions.redo()
+    suspend fun undo(): RecentAction? = withContext(Dispatchers.IO) {
+        val undoData = recentActions.undo()
+        undoData?.let {
+            // Delay the trigger to ensure data is returned first
+            withContext(Dispatchers.Main) {
+                onRecentActionsChanged()
+            }
+        }
+        return@withContext undoData
     }
 
-    fun canRedo() = recentActions.canRedo()
+    suspend fun redo(): RecentAction? = withContext(Dispatchers.IO) {
+        val redoData = recentActions.redo()
+        redoData?.let {
+            withContext(Dispatchers.Main) {
+                Log.d("RecentActionsLog", "Calling Listener with canUndo=${canUndo()}, canRedo=${canRedo()}")
+                onRecentActionsChanged()
+            }
+        }
+        Log.d("RecentActionsLog", "Returned with canUndo=${canUndo()}, canRedo=${canRedo()}")
+        return@withContext redoData
+    }
 
-    fun canUndo() = recentActions.canUndo()
+    fun canRedo() = recentActions.canRedo
 
-    fun clearAll() {
+    fun canUndo() = recentActions.canUndo
+
+    suspend fun clearAll() = withContext(Dispatchers.IO) {
         recentActions.clearAll()
+        onRecentActionsChanged()
     }
 
-    fun getUndoList() = recentActions.getUndoList()
+    suspend fun getUndoList() = recentActions.undoStack
 
-    fun getRedoList() = recentActions.getRedoList()
-
-    fun addAllUndoList(undoList: List<RecentAction>) {
-        recentActions.addAllUndoList(undoList)
-    }
-
-    fun addAllRedoList(redoList: List<RecentAction>) {
-        recentActions.addAllRedoList(redoList)
-    }
+    suspend fun getRedoList() = recentActions.redoStack
 }
