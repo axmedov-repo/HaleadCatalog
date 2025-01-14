@@ -1,9 +1,9 @@
 package com.halead.catalog.app
 
 import android.app.Application
-import android.util.Log
+import com.halead.catalog.BuildConfig
 import dagger.hilt.android.HiltAndroidApp
-import org.opencv.android.OpenCVLoader
+import timber.log.Timber
 
 @HiltAndroidApp
 class App : Application() {
@@ -16,10 +16,15 @@ class App : Application() {
         super.onCreate()
         instance = this
         // Initialize OpenCV
-        if (!OpenCVLoader.initDebug()) {
-            Log.e("OpenCV", "OpenCV initialization failed")
-        } else {
-            Log.d("OpenCV", "OpenCV initialized successfully")
+        /* if (!OpenCVLoader.initDebug()) {
+            timber("OpenCV", "OpenCV initialization failed")
+         } else {
+             timber("OpenCV", "OpenCV initialized successfully")
+         }*/
+
+        // Initialize Timber
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
         }
     }
 }

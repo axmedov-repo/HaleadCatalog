@@ -35,6 +35,7 @@ android {
         jvmTarget = "1.8"
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }
@@ -60,11 +61,11 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     // openCV
-    implementation(libs.opencv)
+//    implementation(libs.opencv)
 
     // camera
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.view)
+//    implementation(libs.androidx.camera.core)
+//    implementation(libs.androidx.camera.view)
 
     // coil
     implementation(libs.coil.compose)
@@ -83,4 +84,10 @@ dependencies {
 
     // Gson
     implementation(libs.google.gson)
+
+    // kotlinx immutable collections
+    implementation(libs.kotlinx.collections.immutable)
+
+    // timber
+    implementation(libs.timber)
 }

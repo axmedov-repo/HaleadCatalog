@@ -1,6 +1,5 @@
 package com.halead.catalog.components
 
-import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -28,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +42,7 @@ import com.halead.catalog.utils.findMinOffset
 import com.halead.catalog.utils.getBitmapFromResource
 import com.halead.catalog.utils.getClippedMaterial
 import com.halead.catalog.utils.resizeBitmap
+import com.halead.catalog.utils.timber
 import kotlin.math.abs
 
 @Composable
@@ -138,10 +137,6 @@ fun ImageEditor(
         Canvas(
             modifier = Modifier
                 .matchParentSize()
-                .graphicsLayer {
-                    clip = true
-
-                }
                 .clip(RoundedCornerShape(8.dp))
                 .pointerInput(currentCursor) {
                     when (currentCursor.type) {
@@ -155,7 +150,7 @@ fun ImageEditor(
                         CursorTypes.HAND -> {
                             detectDragGestures(
                                 onDragStart = { offset ->
-                                    Log.d(
+                                    timber(
                                         "DRAG_GESTURE",
                                         "Drag started ${abs((offset - mainUiState.polygonPoints[1]).getDistance())}"
                                     )
@@ -167,7 +162,7 @@ fun ImageEditor(
                                 onDrag = { change, dragAmount ->
                                     // Update the position of the selected circle
                                     val index = selectedPointIndex
-                                    Log.d("DRAG_GESTURE", "Index=$index")
+                                    timber("DRAG_GESTURE", "Index=$index")
                                     if (index != -1) {
                                         viewModel.updatePolygonPoint(
                                             index,

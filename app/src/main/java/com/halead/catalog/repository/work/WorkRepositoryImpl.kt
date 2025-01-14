@@ -1,6 +1,6 @@
 package com.halead.catalog.repository.work
 
-import android.util.Log
+import com.halead.catalog.utils.timber
 import com.halead.catalog.app.App
 import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.data.models.WorkModel
@@ -67,7 +67,7 @@ class WorkRepositoryImpl @Inject constructor(
                         )
                     )
                 } catch (e: Exception) {
-                    Log.e("InsertError", "Failed to insert workModel: ${e.message}", e)
+                    timber("InsertError", "Failed to insert workModel: ${e.message}")
                 }
             }
         }
@@ -100,7 +100,7 @@ class WorkRepositoryImpl @Inject constructor(
                         )
                     )
                 } catch (e: Exception) {
-                    Log.e("InsertError", "Failed to update workModel: ${e.message}", e)
+                    timber("InsertError", "Failed to update workModel: ${e.message}")
                 }
             }
         }
@@ -112,7 +112,7 @@ class WorkRepositoryImpl @Inject constructor(
                 try {
                     workDao.deleteById(workModel.id)
                 } catch (e: Exception) {
-                    Log.e("InsertError", "Failed to delete workModel: ${e.message}", e)
+                    timber("InsertError", "Failed to delete workModel: ${e.message}")
                 }
             }
         }

@@ -20,12 +20,27 @@ data class MainUiState(
 
 data class TrackedUiState(
     val imageBmp: ImageBitmap?,
-    val overlays: List<OverlayMaterialModel> = emptyList(),
-    val polygonPoints: List<Offset> = emptyList(),
+    val overlays: List<OverlayMaterialModel>,
+    val polygonPoints: List<Offset>,
 )
 
 fun MainUiState.toTrackedState() = TrackedUiState(
     imageBmp = this.imageBmp,
     overlays = this.overlays,
     polygonPoints = this.polygonPoints
+)
+
+data class MaterialDependentState(
+    val imageBmp: ImageBitmap?,
+    val selectedMaterial: Int?,
+    val polygonPoints: List<Offset>,
+    val overlays: List<OverlayMaterialModel>
+)
+
+
+fun MainUiState.toMaterialDependentState() = MaterialDependentState(
+    imageBmp = this.imageBmp,
+    selectedMaterial = this.selectedMaterial,
+    polygonPoints = this.polygonPoints,
+    overlays = this.overlays
 )

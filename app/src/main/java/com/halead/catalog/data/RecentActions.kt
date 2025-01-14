@@ -1,6 +1,6 @@
 package com.halead.catalog.data
 
-import android.util.Log
+import com.halead.catalog.utils.timber
 import com.halead.catalog.data.states.MainUiState
 import com.halead.catalog.utils.UndoRedoManager
 import kotlinx.coroutines.Dispatchers
@@ -16,14 +16,14 @@ class RecentActions {
     private val recentActions = UndoRedoManager<RecentAction>()
 
     suspend fun act(action: RecentAction) = withContext(Dispatchers.IO) {
-        Log.d("RecentActionsLog", "Acting=$action")
-        Log.d("RecentActionsLog", "isUndoStackEmpty=${recentActions.undoStack.isEmpty()}")
-        Log.d(
+        timber("RecentActionsLog", "Acting=$action")
+        timber("RecentActionsLog", "isUndoStackEmpty=${recentActions.undoStack.isEmpty()}")
+        timber(
             "RecentActionsLog",
             "undoStack.peek=${if (!recentActions.undoStack.isEmpty()) recentActions.undoStack.peek() else ""}"
         )
         if (recentActions.undoStack.isEmpty() || recentActions.undoStack.peek() != action) {
-            Log.d("RecentActionsLog", "Acted")
+            timber("RecentActionsLog", "Acted")
             recentActions.addState(action)
         }
     }
@@ -35,7 +35,7 @@ class RecentActions {
 
     suspend fun redo(): RecentAction? = withContext(Dispatchers.IO) {
         val redoData = recentActions.redo()
-        Log.d("RecentActionsLog", "Returned with canUndo=${canUndo()}, canRedo=${canRedo()}")
+        timber("RecentActionsLog", "Returned with canUndo=${canUndo()}, canRedo=${canRedo()}")
         return@withContext redoData
     }
 

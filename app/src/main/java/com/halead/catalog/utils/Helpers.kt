@@ -6,6 +6,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
+import timber.log.Timber
 
 fun findMinOffset(regionPoints: List<Offset>): Offset {
     val minX = regionPoints.minOf { it.x }
@@ -55,4 +56,8 @@ fun getAspectRatioFromResource(resourceId: Int): Float {
             1f // Default aspect ratio if dimensions are invalid
         }
     }
+}
+
+fun timber(tag: String = "TTT", message: String) {
+    Timber.tag(tag).d(message)
 }

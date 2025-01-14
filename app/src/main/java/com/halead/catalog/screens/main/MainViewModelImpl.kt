@@ -1,7 +1,6 @@
 package com.halead.catalog.screens.main
 
 import android.graphics.Bitmap
-import android.util.Log
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
@@ -14,9 +13,12 @@ import com.halead.catalog.data.enums.FunctionsEnum
 import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.data.models.WorkModel
 import com.halead.catalog.data.states.MainUiState
+import com.halead.catalog.data.states.toMaterialDependentState
 import com.halead.catalog.data.states.toTrackedState
 import com.halead.catalog.repository.main.MainRepository
+import com.halead.catalog.utils.timber
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -30,10 +32,9 @@ class MainViewModelImpl @Inject constructor(
     private val recentActions: RecentActions
 ) : MainViewModel, ViewModel() {
     override val mainUiState = MutableStateFlow(MainUiState())
-    private var isStateReacting = false
+    private var isRecentActionSavingEnabled = true
 
     init {
-        Log.d("RecentActionsLog", "init")
         viewModelScope.launch {
             getMaterials()
             observeIsMaterialApplied()
@@ -45,13 +46,8 @@ class MainViewModelImpl @Inject constructor(
     }
 
     private suspend fun observeIsMaterialApplied() {
-        Log.d("RecentActionsLog", "observeMaterialDependentChanges")
         mainUiState
-            .map { state ->
-                listOf(
-                    state.imageBmp, state.selectedMaterial, state.polygonPoints, state.overlays
-                )
-            }
+            .map { it.toMaterialDependentState() }
             .distinctUntilChanged()
             .collect { _ ->
                 mainUiState.update {
@@ -66,15 +62,13 @@ class MainViewModelImpl @Inject constructor(
     }
 
     private suspend fun saveCurrentState() {
-        Log.d("RecentActionsLog", "Sent to save")
         mainUiState
             .map { it.toTrackedState() }
             .distinctUntilChanged()
             .collect {
-                if (!isStateReacting && it.imageBmp != null) {
-                    recentActions.act(
-                        RecentAction.UiState(mainUiState.value)
-                    )
+                if (isRecentActionSavingEnabled && it.imageBmp != null) {
+                    timber("RecentActionsLog", "State saved")
+                    recentActions.act(RecentAction.UiState(mainUiState.value))
                 }
                 updateUndoRedo()
             }
@@ -84,9 +78,11 @@ class MainViewModelImpl @Inject constructor(
         val newCanUndo = recentActions.canUndo()
         val newCanRedo = recentActions.canRedo()
 
-        if (mainUiState.value.canUndo != newCanUndo || mainUiState.value.canRedo != newCanRedo) {
-            mainUiState.update {
-                it.copy(canUndo = newCanUndo, canRedo = newCanRedo)
+        mainUiState.value.let { currentState ->
+            if (currentState.canUndo != newCanUndo || currentState.canRedo != newCanRedo) {
+                mainUiState.update {
+                    it.copy(canUndo = newCanUndo, canRedo = newCanRedo)
+                }
             }
         }
     }
@@ -105,7 +101,7 @@ class MainViewModelImpl @Inject constructor(
 
     override fun selectImage(bitmap: Bitmap?) {
         viewModelScope.launch {
-            isStateReacting = false
+            isRecentActionSavingEnabled = true
             mainUiState.update {
                 it.copy(
                     imageBmp = bitmap?.asImageBitmap(),
@@ -128,7 +124,7 @@ class MainViewModelImpl @Inject constructor(
                 }
 
                 FunctionsEnum.CLEAR_LAYERS -> {
-                    isStateReacting = false
+                    isRecentActionSavingEnabled = true
                     mainUiState.update {
                         it.copy(
                             overlays = emptyList(),
@@ -148,7 +144,7 @@ class MainViewModelImpl @Inject constructor(
 
     override fun addOverlay(overlayMaterial: OverlayMaterialModel) {
         viewModelScope.launch {
-            isStateReacting = false
+            isRecentActionSavingEnabled = true
             mainUiState.update {
                 it.copy(
                     overlays = it.overlays.plus(overlayMaterial)
@@ -159,7 +155,7 @@ class MainViewModelImpl @Inject constructor(
 
     override fun addPolygonPoint(offset: Offset) {
         viewModelScope.launch {
-            isStateReacting = false
+            isRecentActionSavingEnabled = true
             mainUiState.update {
                 it.copy(
                     polygonPoints = it.polygonPoints.plus(offset)
@@ -171,13 +167,11 @@ class MainViewModelImpl @Inject constructor(
     override fun updatePolygonPoint(index: Int, offset: Offset) {
         viewModelScope.launch {
             if (index in mainUiState.value.polygonPoints.indices) {
-                isStateReacting = true
+                isRecentActionSavingEnabled = false
                 mainUiState.update {
                     it.copy(
                         overlays = emptyList(),
-                        polygonPoints = it.polygonPoints.toMutableList().apply {
-                            this[index] = offset
-                        }
+                        polygonPoints = it.polygonPoints.toPersistentList().set(index, offset)
                     )
                 }
             }
@@ -186,14 +180,14 @@ class MainViewModelImpl @Inject constructor(
 
     override fun memorizeUpdatedPolygonPoints() {
         viewModelScope.launch {
-            isStateReacting = false
+            isRecentActionSavingEnabled = true
             mainUiState.update { it.copy() }
         }
     }
 
     override fun clearPolygonPoints() {
         viewModelScope.launch {
-            isStateReacting = false
+            isRecentActionSavingEnabled = true
             mainUiState.update {
                 it.copy(polygonPoints = emptyList())
             }
@@ -201,11 +195,11 @@ class MainViewModelImpl @Inject constructor(
     }
 
     private fun reAct(recentAction: RecentAction?, undo: Boolean) {
-        isStateReacting = true
-        Log.d("RecentActionsLog", "reAct recentAction=${recentAction}")
+        isRecentActionSavingEnabled = false
+        timber("RecentActionsLog", "reAct recentAction=${recentAction}")
         when (recentAction) {
             is RecentAction.UiState -> {
-                Log.d("RecentActionsLog", "reAct condition=${(mainUiState.value != recentAction.mainUiState)}")
+                timber("RecentActionsLog", "reAct condition=${(mainUiState.value != recentAction.mainUiState)}")
                 mainUiState.value = recentAction.mainUiState
             }
 
