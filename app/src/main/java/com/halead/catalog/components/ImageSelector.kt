@@ -27,10 +27,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.halead.catalog.app.App
 import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.ui.theme.ButtonColor
@@ -38,23 +39,22 @@ import com.halead.catalog.utils.getBitmapFromUri
 
 @Composable
 fun ImageSelector(
-    materials: Map<String, Int>,
     imageBmp: ImageBitmap?,
-    selectedMaterial: Int?,
     overlays: List<OverlayMaterialModel>,
+    polygonPoints: List<Offset>,
     modifier: Modifier = Modifier,
     showImagePicker: Boolean = false,
-    applyMaterialTrigger: Boolean,
     currentCursor: CursorData,
     changeImagePickerVisibility: (Boolean) -> Unit,
     onImageSelected: (Bitmap?) -> Unit
 ) {
     var showConfirmationDialog by rememberSaveable { mutableStateOf(false) }
     var launchersResult by remember { mutableStateOf<Bitmap?>(null) }
+    val context = LocalContext.current
 
     LaunchedEffect(launchersResult) {
         if (launchersResult != null) {
-            if (overlays.isNotEmpty()) {
+            if (polygonPoints.size >= 3 || overlays.isNotEmpty()) {
                 showConfirmationDialog = true
             } else {
                 onImageSelected(launchersResult)
@@ -67,7 +67,7 @@ fun ImageSelector(
     }
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        launchersResult = getBitmapFromUri(App.instance, uri)
+        launchersResult = getBitmapFromUri(context, uri)
     }
 
     Box(
@@ -101,12 +101,9 @@ fun ImageSelector(
                 }
             } else {
                 ImageEditor(
-                    materials = materials,
                     imageBitmap = imageBmp,
-                    selectedMaterial = selectedMaterial,
                     overlays = overlays,
-                    currentCursor = currentCursor,
-                    applyMaterialTrigger = applyMaterialTrigger
+                    currentCursor = currentCursor
                 )
             }
         }

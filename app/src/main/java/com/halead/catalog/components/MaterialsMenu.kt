@@ -18,8 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,13 +30,12 @@ import com.halead.catalog.utils.getAspectRatioFromResource
 
 @Composable
 fun MaterialsMenu(
-    materials: Map<String, Int>,
+    materials: List<Int>,
     selectedMaterial: Int?,
+    loadingApplyMaterial: Boolean,
     modifier: Modifier = Modifier,
     onMaterialSelected: (Int) -> Unit
 ) {
-    val materialsList by remember(materials) { mutableStateOf(materials.values) }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -46,13 +43,12 @@ fun MaterialsMenu(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-//        Text(text = "Materials", modifier = Modifier.padding(8.dp), style = MaterialTheme.typography.titleMedium)
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp)
         ) {
-            items(materialsList.toList()) { material ->
-                MenuItem(material, selectedMaterial, onMaterialSelected)
+            items(materials) { material ->
+                MenuItem(material, selectedMaterial, loadingApplyMaterial, onMaterialSelected)
             }
         }
     }
@@ -62,6 +58,7 @@ fun MaterialsMenu(
 fun MenuItem(
     material: Int,
     selectedMaterial: Int?,
+    loadingApplyMaterial: Boolean,
     onMaterialSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -85,9 +82,16 @@ fun MenuItem(
     ) {
         Image(
             modifier = Modifier.fillMaxSize(),
+            painter = painterResource(material),
             contentScale = ContentScale.Crop,
-            contentDescription = null,
-            painter = painterResource(material)
+            contentDescription = null
         )
+        if (loadingApplyMaterial && selectedMaterial == material) {
+            ShimmerEffect(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.LightGray.copy(alpha = 0.5f), shape = RoundedCornerShape(8.dp))
+            )
+        }
     }
 }

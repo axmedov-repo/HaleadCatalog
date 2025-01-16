@@ -5,6 +5,7 @@ import com.halead.catalog.data.states.MainUiState
 import com.halead.catalog.utils.UndoRedoManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 import javax.inject.Singleton
 
 sealed interface RecentAction {
@@ -12,7 +13,7 @@ sealed interface RecentAction {
 }
 
 @Singleton
-class RecentActions {
+class RecentActions @Inject constructor() {
     private val recentActions = UndoRedoManager<RecentAction>()
 
     suspend fun act(action: RecentAction) = withContext(Dispatchers.IO) {

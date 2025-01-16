@@ -6,12 +6,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import timber.log.Timber
 
-fun findMinOffset(regionPoints: List<Offset>): Offset {
-    val minX = regionPoints.minOf { it.x }
-    val minY = regionPoints.minOf { it.y }
-    return Offset(minX, minY)
+suspend fun findMinOffset(regionPoints: List<Offset>): Offset = coroutineScope {
+    val minX = async { regionPoints.minOf { it.x } }
+    val minY = async { regionPoints.minOf { it.y } }
+    return@coroutineScope Offset(minX.await(), minY.await())
 }
 
 fun getRegionSize(regionPoints: List<Offset>): Size {

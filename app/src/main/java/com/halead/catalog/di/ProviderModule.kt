@@ -1,12 +1,12 @@
 package com.halead.catalog.di
 
+import android.content.Context
 import androidx.room.Room
-import com.halead.catalog.app.App
-import com.halead.catalog.data.RecentActions
 import com.halead.catalog.data.room.WorkDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -15,13 +15,8 @@ import javax.inject.Singleton
 class ProviderModule {
     @Provides
     @Singleton
-    fun getRecentActions(): RecentActions = RecentActions()
-
-    @Provides
-    @Singleton
-    fun getWorkDatabase(): WorkDatabase = Room.databaseBuilder(
-        App.instance,
+    fun getWorkDatabase(@ApplicationContext context: Context): WorkDatabase = Room.databaseBuilder(
+        context,
         WorkDatabase::class.java, "work-database"
-    ).build()
-
+    ).build() // Need to add migration if db scheme will be changed in the future.
 }

@@ -2,21 +2,27 @@ package com.halead.catalog.screens.main
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.halead.catalog.components.FunctionsMenu
@@ -41,11 +48,15 @@ import com.halead.catalog.ui.theme.SelectedItemColor
 @Composable
 fun MainScreen(
     selectedTopBarFunction: TopBarFunctionType? = null,
-    mainViewModel: MainViewModel = viewModel<MainViewModelImpl>()
+    viewModel: MainViewModel = viewModel<MainViewModelImpl>()
 ) {
-    val mainUiState by mainViewModel.mainUiState.collectAsState()
+    val mainUiState by viewModel.mainUiState.collectAsState()
     var showImagePickerDialog by rememberSaveable { mutableStateOf(false) }
-    var applyMaterialTrigger by remember { mutableStateOf(false) } // bool value is just for triggering
+    val isPrimaryButtonEnabled by remember(mainUiState.selectedMaterial, mainUiState.imageBmp) {
+        derivedStateOf {
+            mainUiState.selectedMaterial != null && mainUiState.imageBmp != null
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize()) {
@@ -67,23 +78,21 @@ fun MainScreen(
                         if (function.type == FunctionsEnum.REPLACE_IMAGE) {
                             showImagePickerDialog = true
                         } else {
-                            mainViewModel.selectFunction(function)
+                            viewModel.selectFunction(function)
                         }
                     },
-                    onCursorClicked = { mainViewModel.selectCursor(it) }
+                    onCursorClicked = { viewModel.selectCursor(it) }
                 )
                 ImageSelector(
                     modifier = Modifier.weight(1f),
-                    materials = mainUiState.materials,
                     imageBmp = mainUiState.imageBmp,
                     showImagePicker = showImagePickerDialog,
-                    selectedMaterial = mainUiState.selectedMaterial,
+                    polygonPoints = mainUiState.polygonPoints,
                     overlays = mainUiState.overlays,
                     currentCursor = mainUiState.currentCursor,
-                    changeImagePickerVisibility = { showImagePickerDialog = it },
-                    applyMaterialTrigger = applyMaterialTrigger,
+                    changeImagePickerVisibility = { showImagePickerDialog = it }
                 ) {
-                    mainViewModel.selectImage(it)
+                    viewModel.selectImage(it)
                 }
             }
             Column(
@@ -95,24 +104,48 @@ fun MainScreen(
                 Button(
                     modifier = Modifier
                         .padding(16.dp)
-                        .height(50.dp)
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .heightIn(min = 50.dp)
                         .shadow(4.dp, RoundedCornerShape(8.dp))
                         .clip(shape = RoundedCornerShape(8.dp))
                         .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp)),
                     shape = RoundedCornerShape(8.dp),
-                    enabled = mainUiState.selectedMaterial != null,
-                    onClick = { applyMaterialTrigger = !applyMaterialTrigger },
+                    enabled = isPrimaryButtonEnabled,
+                    onClick = { viewModel.applyMaterial() },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (mainUiState.isMaterialApplied) SelectedItemColor else ButtonColor,
                         disabledContainerColor = Color.Gray
                     )
                 ) {
-                    if (mainUiState.selectedMaterial == null) {
-                        Text("Select Material", color = Color.White.copy(alpha = 0.4f))
-                    } else if (mainUiState.isMaterialApplied){
-                        Text("Material Applied", color = Color.White)
+                    val textColor = if (isPrimaryButtonEnabled) Color.White else Color.White.copy(alpha = 0.4f)
+
+                    if (mainUiState.materials.isEmpty()) {
+                        Row(
+                            modifier = Modifier.wrapContentHeight(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                "Loading Materials",
+                                color = textColor,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White.copy(alpha = 0.4f)
+                            )
+                        }
+                    } else if (mainUiState.selectedMaterial == null) {
+                        Text("Select Material", color = textColor, textAlign = TextAlign.Center)
+                    } else if (mainUiState.polygonPoints.size < 3) {
+                        Text("Draw Region", color = textColor, textAlign = TextAlign.Center)
+                    } else if (mainUiState.isMaterialApplied) {
+                        Text("Material Applied", color = textColor, textAlign = TextAlign.Center)
                     } else {
-                        Text("Apply Material", color = Color.White)
+                        Text("Apply Material", color = textColor, textAlign = TextAlign.Center)
                     }
                 }
                 MaterialsMenu(
@@ -122,7 +155,8 @@ fun MainScreen(
                         .background(Color.Red),
                     materials = mainUiState.materials,
                     selectedMaterial = mainUiState.selectedMaterial,
-                    onMaterialSelected = { mainViewModel.selectMaterial(it) }
+                    loadingApplyMaterial = mainUiState.loadingApplyMaterial,
+                    onMaterialSelected = { viewModel.selectMaterial(it) }
                 )
             }
         }
@@ -133,7 +167,7 @@ fun MainScreen(
                 TopBarFunctionType.HISTORY -> {
                     WorkHistoryPanel(
                         onWorkClick = {
-                            mainViewModel.bringHistoryWork(it)
+                            viewModel.bringHistoryWork(it)
                         }
                     )
                 }

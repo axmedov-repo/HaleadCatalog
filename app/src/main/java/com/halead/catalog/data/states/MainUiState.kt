@@ -8,11 +8,12 @@ import com.halead.catalog.data.models.OverlayMaterialModel
 
 data class MainUiState(
     val imageBmp: ImageBitmap? = null,
-    val materials: Map<String, Int> = emptyMap(),
+    val materials: List<Int> = emptyList(),
     val selectedMaterial: Int? = null,
     val overlays: List<OverlayMaterialModel> = emptyList(),
     val polygonPoints: List<Offset> = emptyList(),
     val currentCursor: CursorData = DefaultCursorData,
+    val loadingApplyMaterial :Boolean = false,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val isMaterialApplied: Boolean = false

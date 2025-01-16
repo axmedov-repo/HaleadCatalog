@@ -2,19 +2,28 @@ package com.halead.catalog.app
 
 import android.app.Application
 import com.halead.catalog.BuildConfig
+import com.halead.catalog.data.DataProvider
+import com.halead.catalog.data.cache.BitmapCacheManager
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import timber.log.Timber
+import javax.inject.Inject
 
 @HiltAndroidApp
 class App : Application() {
-    companion object {
-        lateinit var instance: App
-            private set
-    }
+    @Inject
+    lateinit var bitmapCacheManager: BitmapCacheManager
+
+    @Inject
+    lateinit var dataProvider: DataProvider
 
     override fun onCreate() {
         super.onCreate()
-        instance = this
+        CoroutineScope(Dispatchers.IO).launch {
+            bitmapCacheManager.cacheLocalImages(dataProvider.materialsResIds)
+        }
         // Initialize OpenCV
         /* if (!OpenCVLoader.initDebug()) {
             timber("OpenCV", "OpenCV initialization failed")

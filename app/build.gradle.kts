@@ -57,8 +57,8 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    debugImplementation(libs.androidx.ui.tooling)
 
     // openCV
 //    implementation(libs.opencv)
@@ -67,8 +67,8 @@ dependencies {
 //    implementation(libs.androidx.camera.core)
 //    implementation(libs.androidx.camera.view)
 
-    // coil
-    implementation(libs.coil.compose)
+    // glide
+    implementation(libs.glide)
 
     // Hilt
     implementation(libs.hilt.android)
@@ -90,4 +90,7 @@ dependencies {
 
     // timber
     implementation(libs.timber)
+
+    // Lotti animations
+    implementation(libs.lottie.compose)
 }

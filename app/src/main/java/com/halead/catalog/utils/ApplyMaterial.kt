@@ -5,11 +5,12 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import androidx.compose.ui.geometry.Offset
+import kotlinx.coroutines.coroutineScope
 
-fun getClippedMaterial(
+suspend fun getClippedMaterial(
     materialBitmap: Bitmap,
     regionPoints: List<Offset>
-): Bitmap {
+): Bitmap = coroutineScope {
     // Calculate the bounding box of the polygon
     val minX = regionPoints.minOf { it.x }
     val minY = regionPoints.minOf { it.y }
@@ -53,6 +54,6 @@ fun getClippedMaterial(
     canvas.drawBitmap(resizedMaterial, 0f, 0f, Paint())
 
     // Return the resulting bitmap containing the clipped material
-    return resultBitmap
+    return@coroutineScope resultBitmap
 }
 

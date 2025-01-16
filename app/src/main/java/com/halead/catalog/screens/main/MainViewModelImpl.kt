@@ -16,12 +16,21 @@ import com.halead.catalog.data.states.MainUiState
 import com.halead.catalog.data.states.toMaterialDependentState
 import com.halead.catalog.data.states.toTrackedState
 import com.halead.catalog.repository.main.MainRepository
+import com.halead.catalog.utils.findMinOffset
+import com.halead.catalog.utils.getClippedMaterial
+import com.halead.catalog.utils.resizeBitmap
 import com.halead.catalog.utils.timber
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -35,6 +44,7 @@ class MainViewModelImpl @Inject constructor(
     private var isRecentActionSavingEnabled = true
 
     init {
+        timber("Materials", "init")
         viewModelScope.launch {
             getMaterials()
             observeIsMaterialApplied()
@@ -58,6 +68,7 @@ class MainViewModelImpl @Inject constructor(
 
     private suspend fun isMaterialApplied(): Boolean {
         val overlayPoints = mainUiState.value.overlays.flatMap { it.regionPoints }
+        if (overlayPoints.isEmpty()) return false
         return mainUiState.value.polygonPoints.all { it in overlayPoints }
     }
 
@@ -88,10 +99,16 @@ class MainViewModelImpl @Inject constructor(
     }
 
     private fun getMaterials() {
-        mainUiState.update {
-            it.copy(materials = mainRepository.getMaterials())
-        }
+        mainRepository.getMaterials().onEach { response ->
+            response.onSuccess { result ->
+                timber("Materials", "getMaterials()=$result")
+                mainUiState.update {
+                    it.copy(materials = result)
+                }
+            }
+        }.launchIn(viewModelScope)
     }
+
 
     override fun selectMaterial(material: Int) {
         mainUiState.update {
@@ -142,13 +159,53 @@ class MainViewModelImpl @Inject constructor(
         mainUiState.update { it.copy(currentCursor = cursorData) }
     }
 
-    override fun addOverlay(overlayMaterial: OverlayMaterialModel) {
+    override fun applyMaterial() {
         viewModelScope.launch {
-            isRecentActionSavingEnabled = true
-            mainUiState.update {
-                it.copy(
-                    overlays = it.overlays.plus(overlayMaterial)
-                )
+            if (!mainUiState.value.isMaterialApplied && mainUiState.value.polygonPoints.isNotEmpty()) {
+                mainUiState.update { it.copy(loadingApplyMaterial = true) }
+
+                val selectedMaterialBmp: Bitmap? = mainUiState.value.selectedMaterial?.let { material ->
+                    mainRepository.getBitmap(material)
+                        .onEach { result ->
+                            result.onFailure { error ->
+                                timber("Error", "Failed to fetch bitmap: ${error.message}")
+                            }
+                        }
+                        .mapNotNull { it.getOrNull() } // Extract the Bitmap if successful
+                        .firstOrNull() // Collect the first valid bitmap
+                }
+
+                timber("Materials", "selectedMaterialBmp=$selectedMaterialBmp")
+
+                if (mainUiState.value.polygonPoints.isNotEmpty() && selectedMaterialBmp != null) {
+                    val offsetOfOverlay = async(Dispatchers.Default) {
+                        findMinOffset(mainUiState.value.polygonPoints)
+                    }
+
+                    // Generate and add the overlay
+                    val appliedMaterialBitmap = async(Dispatchers.Default) {
+                        getClippedMaterial(
+                            materialBitmap = resizeBitmap(selectedMaterialBmp, 1024, 1024),
+                            regionPoints = mainUiState.value.polygonPoints
+                        )
+                    }
+
+                    isRecentActionSavingEnabled = true
+
+                    mainUiState.update {
+                        it.copy(
+                            overlays = it.overlays.plus(
+                                OverlayMaterialModel(
+                                    materialBitmap = appliedMaterialBitmap.await(),
+                                    regionPoints = mainUiState.value.polygonPoints,
+                                    position = offsetOfOverlay.await()
+                                )
+                            )
+                        )
+                    }
+                }
+
+                mainUiState.update { it.copy(loadingApplyMaterial = false) }
             }
         }
     }

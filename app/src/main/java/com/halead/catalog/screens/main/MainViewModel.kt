@@ -15,7 +15,7 @@ interface MainViewModel {
     fun selectImage(bitmap: Bitmap?)
     fun selectFunction(function: FunctionData)
     fun selectCursor(cursorData: CursorData)
-    fun addOverlay(overlayMaterial: OverlayMaterialModel)
+    fun applyMaterial()
     fun bringHistoryWork(workModel: WorkModel)
     fun addPolygonPoint(offset: Offset)
     fun updatePolygonPoint(index: Int, offset: Offset)

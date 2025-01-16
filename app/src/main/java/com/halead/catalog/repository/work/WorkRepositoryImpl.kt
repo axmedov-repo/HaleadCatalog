@@ -1,5 +1,6 @@
 package com.halead.catalog.repository.work
 
+import android.content.Context
 import com.halead.catalog.utils.timber
 import com.halead.catalog.app.App
 import com.halead.catalog.data.models.OverlayMaterialModel
@@ -9,12 +10,14 @@ import com.halead.catalog.data.room.WorkDatabase
 import com.halead.catalog.data.room.WorkRoomEntity
 import com.halead.catalog.utils.loadImageFromFile
 import com.halead.catalog.utils.saveImageToFile
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class WorkRepositoryImpl @Inject constructor(
+    @ApplicationContext private val context: Context,
     workDatabase: WorkDatabase
 ) : WorkRepository {
     private val workDao = workDatabase.workDao()
@@ -48,7 +51,7 @@ class WorkRepositoryImpl @Inject constructor(
                         WorkRoomEntity(
                             id = workModel.id,
                             baseImageFilePath = saveImageToFile(
-                                App.instance,
+                                context,
                                 workModel.baseImage,
                                 "baseImage${workModel.id}"
                             ),
@@ -56,7 +59,7 @@ class WorkRepositoryImpl @Inject constructor(
                                 OverlayMaterialRoomEntity(
                                     id = overlay.id,
                                     materialFilePath = saveImageToFile(
-                                        App.instance,
+                                        context,
                                         overlay.materialBitmap,
                                         "overlayMaterialImage${overlay.id}"
                                     ),
@@ -81,7 +84,7 @@ class WorkRepositoryImpl @Inject constructor(
                         WorkRoomEntity(
                             id = workModel.id,
                             baseImageFilePath = saveImageToFile(
-                                App.instance,
+                                context,
                                 workModel.baseImage,
                                 "baseImage${workModel.id}"
                             ),
@@ -89,7 +92,7 @@ class WorkRepositoryImpl @Inject constructor(
                                 OverlayMaterialRoomEntity(
                                     id = overlay.id,
                                     materialFilePath = saveImageToFile(
-                                        App.instance,
+                                        context,
                                         overlay.materialBitmap,
                                         "overlayMaterialImage${overlay.id}"
                                     ),
