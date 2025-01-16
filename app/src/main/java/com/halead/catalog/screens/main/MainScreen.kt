@@ -51,10 +51,22 @@ fun MainScreen(
     viewModel: MainViewModel = viewModel<MainViewModelImpl>()
 ) {
     val mainUiState by viewModel.mainUiState.collectAsState()
+    val loadingApplyMaterial by viewModel.loadingApplyMaterial.collectAsState()
     var showImagePickerDialog by rememberSaveable { mutableStateOf(false) }
     val isPrimaryButtonEnabled by remember(mainUiState.selectedMaterial, mainUiState.imageBmp) {
         derivedStateOf {
             mainUiState.selectedMaterial != null && mainUiState.imageBmp != null
+        }
+    }
+    val primaryButtonText by remember(mainUiState) {
+        derivedStateOf {
+            when {
+                mainUiState.materials.isEmpty() -> "Loading Materials"
+                mainUiState.selectedMaterial == null -> "Select Material"
+                mainUiState.polygonPoints.size < 3 -> "Draw Region"
+                mainUiState.isMaterialApplied -> "Material Applied"
+                else -> "Apply Material"
+            }
         }
     }
 
@@ -120,17 +132,17 @@ fun MainScreen(
                 ) {
                     val textColor = if (isPrimaryButtonEnabled) Color.White else Color.White.copy(alpha = 0.4f)
 
-                    if (mainUiState.materials.isEmpty()) {
-                        Row(
-                            modifier = Modifier.wrapContentHeight(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                "Loading Materials",
-                                color = textColor,
-                                textAlign = TextAlign.Center
-                            )
+                    Row(
+                        modifier = Modifier.wrapContentHeight(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = primaryButtonText,
+                            color = textColor,
+                            textAlign = TextAlign.Center
+                        )
+                        if (mainUiState.materials.isEmpty()) {
                             Spacer(Modifier.width(4.dp))
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
@@ -138,14 +150,6 @@ fun MainScreen(
                                 color = Color.White.copy(alpha = 0.4f)
                             )
                         }
-                    } else if (mainUiState.selectedMaterial == null) {
-                        Text("Select Material", color = textColor, textAlign = TextAlign.Center)
-                    } else if (mainUiState.polygonPoints.size < 3) {
-                        Text("Draw Region", color = textColor, textAlign = TextAlign.Center)
-                    } else if (mainUiState.isMaterialApplied) {
-                        Text("Material Applied", color = textColor, textAlign = TextAlign.Center)
-                    } else {
-                        Text("Apply Material", color = textColor, textAlign = TextAlign.Center)
                     }
                 }
                 MaterialsMenu(
@@ -155,7 +159,7 @@ fun MainScreen(
                         .background(Color.Red),
                     materials = mainUiState.materials,
                     selectedMaterial = mainUiState.selectedMaterial,
-                    loadingApplyMaterial = mainUiState.loadingApplyMaterial,
+                    loadingApplyMaterial = loadingApplyMaterial,
                     onMaterialSelected = { viewModel.selectMaterial(it) }
                 )
             }
@@ -166,9 +170,7 @@ fun MainScreen(
                 TopBarFunctionType.MENU -> {}
                 TopBarFunctionType.HISTORY -> {
                     WorkHistoryPanel(
-                        onWorkClick = {
-                            viewModel.bringHistoryWork(it)
-                        }
+                        onWorkClick = { viewModel.bringHistoryWork(it) }
                     )
                 }
 

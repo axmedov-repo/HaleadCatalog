@@ -7,7 +7,8 @@ import androidx.room.PrimaryKey
 @Entity
 data class OverlayMaterialRoomEntity(
     @PrimaryKey(autoGenerate = true) val id: Int,
-    val materialFilePath: String,
+    val overlayFilePath: String,
+    val material : Int, // because of it is static image currently
     val regionPoints: List<Offset>,
     var position: Offset = Offset(0f, 0f)
 )

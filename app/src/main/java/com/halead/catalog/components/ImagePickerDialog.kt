@@ -62,8 +62,8 @@ fun ImagePickerDialog(
                     ) {
                         Column(
                             modifier = Modifier
-                                .padding(16.dp)
-                                .clickable { onCameraClick() },
+                                .clickable { onCameraClick() }
+                                .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -79,8 +79,8 @@ fun ImagePickerDialog(
 
                         Column(
                             modifier = Modifier
-                                .padding(16.dp)
-                                .clickable { onGalleryClick() },
+                                .clickable { onGalleryClick() }
+                                .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {

@@ -1,8 +1,6 @@
 package com.halead.catalog.repository.work
 
 import android.content.Context
-import com.halead.catalog.utils.timber
-import com.halead.catalog.app.App
 import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.data.models.WorkModel
 import com.halead.catalog.data.room.OverlayMaterialRoomEntity
@@ -10,6 +8,7 @@ import com.halead.catalog.data.room.WorkDatabase
 import com.halead.catalog.data.room.WorkRoomEntity
 import com.halead.catalog.utils.loadImageFromFile
 import com.halead.catalog.utils.saveImageToFile
+import com.halead.catalog.utils.timber
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -28,13 +27,14 @@ class WorkRepositoryImpl @Inject constructor(
                 WorkModel(
                     id = work.id,
                     baseImage = baseImage,
-                    overlays = work.overlays.mapNotNull { overlay ->
-                        loadImageFromFile(overlay.materialFilePath)?.let { materialImage ->
+                    overlays = work.overlays.mapNotNull { overlayData ->
+                        loadImageFromFile(overlayData.overlayFilePath)?.let { overlay ->
                             OverlayMaterialModel(
-                                id = overlay.id,
-                                materialBitmap = materialImage,
-                                regionPoints = overlay.regionPoints,
-                                position = overlay.position
+                                id = overlayData.id,
+                                overlay = overlay,
+                                material = overlayData.material,
+                                regionPoints = overlayData.regionPoints,
+                                position = overlayData.position
                             )
                         }
                     }
@@ -55,16 +55,17 @@ class WorkRepositoryImpl @Inject constructor(
                                 workModel.baseImage,
                                 "baseImage${workModel.id}"
                             ),
-                            overlays = workModel.overlays.map { overlay ->
+                            overlays = workModel.overlays.map { overlayData ->
                                 OverlayMaterialRoomEntity(
-                                    id = overlay.id,
-                                    materialFilePath = saveImageToFile(
+                                    id = overlayData.id,
+                                    overlayFilePath = saveImageToFile(
                                         context,
-                                        overlay.materialBitmap,
-                                        "overlayMaterialImage${overlay.id}"
+                                        overlayData.overlay,
+                                        "overlayMaterialImage${overlayData.id}"
                                     ),
-                                    regionPoints = overlay.regionPoints,
-                                    position = overlay.position
+                                    material = overlayData.material,
+                                    regionPoints = overlayData.regionPoints,
+                                    position = overlayData.position
                                 )
                             }
                         )
@@ -88,16 +89,17 @@ class WorkRepositoryImpl @Inject constructor(
                                 workModel.baseImage,
                                 "baseImage${workModel.id}"
                             ),
-                            overlays = workModel.overlays.map { overlay ->
+                            overlays = workModel.overlays.map { overlayData ->
                                 OverlayMaterialRoomEntity(
-                                    id = overlay.id,
-                                    materialFilePath = saveImageToFile(
+                                    id = overlayData.id,
+                                    overlayFilePath = saveImageToFile(
                                         context,
-                                        overlay.materialBitmap,
-                                        "overlayMaterialImage${overlay.id}"
+                                        overlayData.overlay,
+                                        "overlayMaterialImage${overlayData.id}"
                                     ),
-                                    regionPoints = overlay.regionPoints,
-                                    position = overlay.position
+                                    material = overlayData.material,
+                                    regionPoints = overlayData.regionPoints,
+                                    position = overlayData.position
                                 )
                             }
                         )

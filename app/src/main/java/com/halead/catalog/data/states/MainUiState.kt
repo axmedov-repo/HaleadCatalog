@@ -13,7 +13,6 @@ data class MainUiState(
     val overlays: List<OverlayMaterialModel> = emptyList(),
     val polygonPoints: List<Offset> = emptyList(),
     val currentCursor: CursorData = DefaultCursorData,
-    val loadingApplyMaterial :Boolean = false,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val isMaterialApplied: Boolean = false

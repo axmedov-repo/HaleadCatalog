@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import timber.log.Timber
+import java.util.Stack
 
 suspend fun findMinOffset(regionPoints: List<Offset>): Offset = coroutineScope {
     val minX = async { regionPoints.minOf { it.x } }
@@ -62,4 +63,8 @@ fun getAspectRatioFromResource(resourceId: Int): Float {
 
 fun timber(tag: String = "TTT", message: String) {
     Timber.tag(tag).d(message)
+}
+
+fun <T> Stack<T>.peekOrNull(): T? {
+    return if (this.isEmpty()) null else this.peek()
 }

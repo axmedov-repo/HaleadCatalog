@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -72,14 +73,21 @@ fun ImageEditor(
                 .clip(RoundedCornerShape(8.dp))
         )
 
-        // Draw overlays
-        Canvas(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(RoundedCornerShape(8.dp))
-        ) {
-            overlays.forEach { overlay ->
-                drawImage(overlay.materialBitmap.asImageBitmap(), topLeft = overlay.position)
+        if (overlays.isNotEmpty()) {
+            // Draw overlays
+            Canvas(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                overlays.forEach { overlay ->
+                    drawImage(overlay.overlay.asImageBitmap(), topLeft = overlay.position)
+                }
+            }
+
+            LaunchedEffect(overlays) {
+                timber("allOverlaysDrawn", "allOverlaysDrawn called")
+                viewModel.allOverlaysDrawn()
             }
         }
 

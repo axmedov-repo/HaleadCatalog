@@ -24,8 +24,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -41,6 +43,7 @@ class MainViewModelImpl @Inject constructor(
     private val recentActions: RecentActions
 ) : MainViewModel, ViewModel() {
     override val mainUiState = MutableStateFlow(MainUiState())
+    override val loadingApplyMaterial = MutableStateFlow(false)
     private var isRecentActionSavingEnabled = true
 
     init {
@@ -66,33 +69,52 @@ class MainViewModelImpl @Inject constructor(
             }
     }
 
-    private suspend fun isMaterialApplied(): Boolean {
+    /*
+    private fun isMaterialApplied(): Boolean {
         val overlayPoints = mainUiState.value.overlays.flatMap { it.regionPoints }
-        if (overlayPoints.isEmpty()) return false
-        return mainUiState.value.polygonPoints.all { it in overlayPoints }
+        return if (overlayPoints.isEmpty() || !mainUiState.value.polygonPoints.all { it in overlayPoints }) {
+            false
+        } else {
+            mainUiState.value.overlays.last().material == mainUiState.value.selectedMaterial
+        }
+    }
+    */
+
+    private fun isMaterialApplied(): Boolean {
+        val overlayPoints = mainUiState.value.overlays.flatMap { it.regionPoints }
+        return if (overlayPoints.isEmpty() || (mainUiState.value.polygonPoints.minus(overlayPoints).isNotEmpty())) {
+            false
+        } else {
+            mainUiState.value.overlays.last().material == mainUiState.value.selectedMaterial
+        }
     }
 
     private suspend fun saveCurrentState() {
         mainUiState
+            .filter { isRecentActionSavingEnabled }
             .map { it.toTrackedState() }
             .distinctUntilChanged()
             .collect {
-                if (isRecentActionSavingEnabled && it.imageBmp != null) {
+                if (it.imageBmp != null) {
                     timber("RecentActionsLog", "State saved")
                     recentActions.act(RecentAction.UiState(mainUiState.value))
                 }
+
                 updateUndoRedo()
             }
     }
 
-    private fun updateUndoRedo() {
-        val newCanUndo = recentActions.canUndo()
-        val newCanRedo = recentActions.canRedo()
+    private suspend fun updateUndoRedo() = coroutineScope {
+        val newCanUndo = async { recentActions.canUndo() }
+        val newCanRedo = async { recentActions.canRedo() }
+
+        val canUndoValue = newCanUndo.await()
+        val canRedoValue = newCanRedo.await()
 
         mainUiState.value.let { currentState ->
-            if (currentState.canUndo != newCanUndo || currentState.canRedo != newCanRedo) {
+            if (currentState.canUndo != canUndoValue || currentState.canRedo != canRedoValue) {
                 mainUiState.update {
-                    it.copy(canUndo = newCanUndo, canRedo = newCanRedo)
+                    it.copy(canUndo = canUndoValue, canRedo = canRedoValue)
                 }
             }
         }
@@ -118,7 +140,6 @@ class MainViewModelImpl @Inject constructor(
 
     override fun selectImage(bitmap: Bitmap?) {
         viewModelScope.launch {
-            isRecentActionSavingEnabled = true
             mainUiState.update {
                 it.copy(
                     imageBmp = bitmap?.asImageBitmap(),
@@ -141,7 +162,6 @@ class MainViewModelImpl @Inject constructor(
                 }
 
                 FunctionsEnum.CLEAR_LAYERS -> {
-                    isRecentActionSavingEnabled = true
                     mainUiState.update {
                         it.copy(
                             overlays = emptyList(),
@@ -161,58 +181,65 @@ class MainViewModelImpl @Inject constructor(
 
     override fun applyMaterial() {
         viewModelScope.launch {
-            if (!mainUiState.value.isMaterialApplied && mainUiState.value.polygonPoints.isNotEmpty()) {
-                mainUiState.update { it.copy(loadingApplyMaterial = true) }
+            val uiState = mainUiState.value
 
-                val selectedMaterialBmp: Bitmap? = mainUiState.value.selectedMaterial?.let { material ->
+            if (!uiState.isMaterialApplied && uiState.polygonPoints.isNotEmpty()) {
+                loadingApplyMaterial.value = true
+
+                val selectedMaterialBmp = uiState.selectedMaterial?.let { material ->
                     mainRepository.getBitmap(material)
                         .onEach { result ->
                             result.onFailure { error ->
                                 timber("Error", "Failed to fetch bitmap: ${error.message}")
                             }
                         }
-                        .mapNotNull { it.getOrNull() } // Extract the Bitmap if successful
-                        .firstOrNull() // Collect the first valid bitmap
+                        .mapNotNull { it.getOrNull() }
+                        .firstOrNull()
                 }
 
                 timber("Materials", "selectedMaterialBmp=$selectedMaterialBmp")
 
-                if (mainUiState.value.polygonPoints.isNotEmpty() && selectedMaterialBmp != null) {
-                    val offsetOfOverlay = async(Dispatchers.Default) {
-                        findMinOffset(mainUiState.value.polygonPoints)
+                if (uiState.polygonPoints.isNotEmpty() && selectedMaterialBmp != null) {
+                    val resizedBitmap = async(Dispatchers.Default) {
+                        resizeBitmap(selectedMaterialBmp, 1024, 1024)
                     }
 
-                    // Generate and add the overlay
+                    val offsetOfOverlay = async(Dispatchers.Default) {
+                        findMinOffset(uiState.polygonPoints)
+                    }
+
                     val appliedMaterialBitmap = async(Dispatchers.Default) {
                         getClippedMaterial(
-                            materialBitmap = resizeBitmap(selectedMaterialBmp, 1024, 1024),
-                            regionPoints = mainUiState.value.polygonPoints
+                            materialBitmap = resizedBitmap.await(),
+                            regionPoints = uiState.polygonPoints
                         )
                     }
-
-                    isRecentActionSavingEnabled = true
 
                     mainUiState.update {
                         it.copy(
                             overlays = it.overlays.plus(
                                 OverlayMaterialModel(
-                                    materialBitmap = appliedMaterialBitmap.await(),
-                                    regionPoints = mainUiState.value.polygonPoints,
+                                    overlay = appliedMaterialBitmap.await(),
+                                    regionPoints = uiState.polygonPoints,
+                                    material = uiState.selectedMaterial,
                                     position = offsetOfOverlay.await()
                                 )
                             )
                         )
                     }
                 }
-
-                mainUiState.update { it.copy(loadingApplyMaterial = false) }
             }
+        }
+    }
+
+    override fun allOverlaysDrawn() {
+        viewModelScope.launch {
+            loadingApplyMaterial.value = false
         }
     }
 
     override fun addPolygonPoint(offset: Offset) {
         viewModelScope.launch {
-            isRecentActionSavingEnabled = true
             mainUiState.update {
                 it.copy(
                     polygonPoints = it.polygonPoints.plus(offset)
@@ -231,20 +258,19 @@ class MainViewModelImpl @Inject constructor(
                         polygonPoints = it.polygonPoints.toPersistentList().set(index, offset)
                     )
                 }
+                isRecentActionSavingEnabled = true
             }
         }
     }
 
     override fun memorizeUpdatedPolygonPoints() {
         viewModelScope.launch {
-            isRecentActionSavingEnabled = true
             mainUiState.update { it.copy() }
         }
     }
 
     override fun clearPolygonPoints() {
         viewModelScope.launch {
-            isRecentActionSavingEnabled = true
             mainUiState.update {
                 it.copy(polygonPoints = emptyList())
             }
@@ -252,24 +278,27 @@ class MainViewModelImpl @Inject constructor(
     }
 
     private fun reAct(recentAction: RecentAction?, undo: Boolean) {
-        isRecentActionSavingEnabled = false
         timber("RecentActionsLog", "reAct recentAction=${recentAction}")
+        var newState = mainUiState.value
         when (recentAction) {
             is RecentAction.UiState -> {
                 timber("RecentActionsLog", "reAct condition=${(mainUiState.value != recentAction.mainUiState)}")
-                mainUiState.value = recentAction.mainUiState
+                newState = recentAction.mainUiState
             }
 
             null -> {
                 if (undo) {
-                    mainUiState.update {
-                        it.copy(
-                            imageBmp = null,
-                            overlays = emptyList(),
-                            polygonPoints = emptyList()
-                        )
-                    }
+                    newState = MainUiState(materials = mainUiState.value.materials)
                 }
+            }
+        }
+
+        if (newState != mainUiState.value) {
+            mainUiState.update {
+                if (newState.overlays.isNotEmpty() && newState.overlays != mainUiState.value.overlays) {
+                    loadingApplyMaterial.value = true
+                }
+                newState
             }
         }
     }

@@ -11,11 +11,13 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface MainViewModel {
     val mainUiState: StateFlow<MainUiState>
+    val loadingApplyMaterial: StateFlow<Boolean>
     fun selectMaterial(material: Int)
     fun selectImage(bitmap: Bitmap?)
     fun selectFunction(function: FunctionData)
     fun selectCursor(cursorData: CursorData)
     fun applyMaterial()
+    fun allOverlaysDrawn()
     fun bringHistoryWork(workModel: WorkModel)
     fun addPolygonPoint(offset: Offset)
     fun updatePolygonPoint(index: Int, offset: Offset)

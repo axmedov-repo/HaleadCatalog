@@ -3,8 +3,8 @@ package com.halead.catalog.utils
 import java.util.Stack
 
 class UndoRedoManager<T> {
-     val undoStack = Stack<T>()
-     val redoStack = Stack<T>()
+    val undoStack = Stack<T>()
+    val redoStack = Stack<T>()
 
     var canUndo: Boolean = false
         private set
@@ -47,6 +47,8 @@ class UndoRedoManager<T> {
         redoStack.clear()
     }
 
+
+    // Need for work history
     fun addAllUndoList(undoList: List<T>) {
         undoStack.clear()
         undoStack.addAll(undoList)
