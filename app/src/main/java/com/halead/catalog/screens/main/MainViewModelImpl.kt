@@ -178,6 +178,14 @@ class MainViewModelImpl @Inject constructor(
                     }
                 }
 
+                FunctionsEnum.ADD_LAYER -> {
+                    mainUiState.update {
+                        it.copy(
+                            polygonPoints = emptyList()
+                        )
+                    }
+                }
+
                 FunctionsEnum.CLEAR_LAYERS -> {
                     mainUiState.update {
                         it.copy(

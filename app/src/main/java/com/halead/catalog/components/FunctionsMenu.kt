@@ -108,7 +108,7 @@ fun FunctionItem(
             when (data.type) {
                 FunctionsEnum.REDO -> !canRedo
                 FunctionsEnum.UNDO -> !canUndo
-                FunctionsEnum.REPLACE_IMAGE -> baseImage == null
+                FunctionsEnum.REPLACE_IMAGE, FunctionsEnum.ADD_LAYER -> baseImage == null
                 FunctionsEnum.CLEAR_LAYERS -> isOverlaysEmpty
                 else -> false
             }

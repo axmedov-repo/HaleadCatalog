@@ -3,7 +3,7 @@ package com.halead.catalog.data.enums
 import com.halead.catalog.R
 
 enum class FunctionsEnum {
-    REPLACE_IMAGE, UNDO, REDO,CLEAR_LAYERS
+    REPLACE_IMAGE, UNDO, REDO, ADD_LAYER, CLEAR_LAYERS
 }
 
 data class FunctionData(
@@ -14,7 +14,7 @@ data class FunctionData(
 
 val functionsList = listOf(
     FunctionData(
-        img = R.drawable.ic_change,
+        img = R.drawable.ic_reset_image,
         text = "Replace",
         type = FunctionsEnum.REPLACE_IMAGE
     ),
@@ -27,6 +27,11 @@ val functionsList = listOf(
         img = R.drawable.ic_redo,
         text = "Redo",
         type = FunctionsEnum.REDO
+    ),
+    FunctionData(
+        img = R.drawable.ic_layer_add,
+        text = "Add Layer",
+        type = FunctionsEnum.ADD_LAYER
     ),
     FunctionData(
         img = R.drawable.ic_layers_clear,

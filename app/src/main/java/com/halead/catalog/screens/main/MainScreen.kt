@@ -19,7 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -33,9 +33,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.halead.catalog.R
+import com.halead.catalog.components.AutoSizeText
 import com.halead.catalog.components.FunctionsMenu
 import com.halead.catalog.components.ImageSelector
 import com.halead.catalog.components.MaterialsMenu
@@ -126,7 +129,7 @@ fun MainScreen(
                     enabled = isPrimaryButtonEnabled,
                     onClick = { viewModel.applyMaterial() },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (mainUiState.isMaterialApplied) SelectedItemColor else ButtonColor,
+                        containerColor = if (mainUiState.isMaterialApplied &&  mainUiState.polygonPoints.size >= 3) SelectedItemColor else ButtonColor,
                         disabledContainerColor = Color.Gray
                     )
                 ) {
@@ -137,10 +140,12 @@ fun MainScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Text(
+                        AutoSizeText(
+                            modifier = Modifier.weight(1f),
+                            suggestedFontSizes = listOf(14.sp),
                             text = primaryButtonText,
                             color = textColor,
-                            textAlign = TextAlign.Center
+                            alignment = Alignment.Center
                         )
                         if (mainUiState.materials.isEmpty()) {
                             Spacer(Modifier.width(4.dp))
@@ -148,6 +153,14 @@ fun MainScreen(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
                                 color = Color.White.copy(alpha = 0.4f)
+                            )
+                        } else if (mainUiState.selectedMaterial == null) {
+                            Spacer(Modifier.width(4.dp))
+                            Icon(
+                                modifier = Modifier.size(16.dp),
+                                tint = Color.White.copy(alpha = 0.4f),
+                                painter = painterResource(R.drawable.ic_arrow_downward),
+                                contentDescription = null
                             )
                         }
                     }

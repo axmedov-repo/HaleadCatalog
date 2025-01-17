@@ -88,7 +88,6 @@ fun ImageSelector(
             if (imageBmp == null) {
                 Button(
                     modifier = Modifier
-                        .padding(16.dp)
                         .height(50.dp)
                         .shadow(4.dp, RoundedCornerShape(8.dp))
                         .clip(shape = RoundedCornerShape(8.dp))

@@ -13,19 +13,19 @@ data class CursorData(
 )
 
 val DefaultCursorData = CursorData(
-    img = R.drawable.ic_draw,
+    img = R.drawable.ic_control_point,
     text = "Draw",
     type = CursorTypes.DRAW
 )
 
 val cursorTypesList = listOf(
     CursorData(
-        img = R.drawable.ic_draw,
+        img = R.drawable.ic_control_point,
         text = "Draw",
         type = CursorTypes.DRAW
     ),
     CursorData(
-        img = R.drawable.ic_hand,
+        img = R.drawable.ic_swipe,
         text = "Hand",
         type = CursorTypes.HAND
     )
