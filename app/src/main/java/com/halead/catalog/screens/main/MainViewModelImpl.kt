@@ -25,6 +25,7 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -45,6 +46,8 @@ class MainViewModelImpl @Inject constructor(
     override val mainUiState = MutableStateFlow(MainUiState())
     override val loadingApplyMaterial = MutableStateFlow(false)
     private var isRecentActionSavingEnabled = true
+    private var isUndoEnabled: Boolean = true
+    private var isRedoEnabled: Boolean = true
 
     init {
         timber("Materials", "init")
@@ -154,11 +157,25 @@ class MainViewModelImpl @Inject constructor(
         viewModelScope.launch {
             when (function.type) {
                 FunctionsEnum.UNDO -> {
-                    reAct(recentActions.undo(), true)
+                    if (isUndoEnabled) {
+                        isUndoEnabled = false
+                        launch {
+                            delay(50)
+                            isUndoEnabled = true
+                        }
+                        reAct(recentActions.undo(), true)
+                    }
                 }
 
                 FunctionsEnum.REDO -> {
-                    reAct(recentActions.redo(), false)
+                    if (isRedoEnabled) {
+                        isRedoEnabled = false
+                        launch {
+                            delay(50)
+                            isRedoEnabled = true
+                        }
+                        reAct(recentActions.redo(), false)
+                    }
                 }
 
                 FunctionsEnum.CLEAR_LAYERS -> {

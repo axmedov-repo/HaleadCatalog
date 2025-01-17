@@ -89,6 +89,11 @@ fun ImageEditor(
                 timber("allOverlaysDrawn", "allOverlaysDrawn called")
                 viewModel.allOverlaysDrawn()
             }
+        } else {
+            LaunchedEffect(overlays) {
+                timber("allOverlaysDrawn", "allOverlaysDrawn called")
+                viewModel.allOverlaysDrawn()
+            }
         }
 
         // Draw Region (polygon points)
@@ -107,10 +112,6 @@ fun ImageEditor(
                         CursorTypes.HAND -> {
                             detectDragGestures(
                                 onDragStart = { offset ->
-                                    timber(
-                                        "DRAG_GESTURE",
-                                        "Drag started ${abs((offset - mainUiState.polygonPoints[1]).getDistance())}"
-                                    )
                                     // Check if the touch is near any of the circles
                                     selectedPointIndex = mainUiState.polygonPoints.indexOfFirst { point ->
                                         (offset - point).getDistance() <= 30f // 8f is the circle radius
@@ -118,12 +119,10 @@ fun ImageEditor(
                                 },
                                 onDrag = { change, dragAmount ->
                                     // Update the position of the selected circle
-                                    val index = selectedPointIndex
-                                    timber("DRAG_GESTURE", "Index=$index")
-                                    if (index != -1) {
+                                    if (selectedPointIndex != -1) {
                                         viewModel.updatePolygonPoint(
-                                            index,
-                                            mainUiState.polygonPoints[index] + Offset(dragAmount.x, dragAmount.y)
+                                            selectedPointIndex,
+                                            mainUiState.polygonPoints[selectedPointIndex] + Offset(dragAmount.x, dragAmount.y)
                                         )
                                     }
                                     change.consume() // Consume the drag event
@@ -138,11 +137,11 @@ fun ImageEditor(
                 }
         ) {
             if (mainUiState.polygonPoints.isNotEmpty()) {
-                for (i in 1 until mainUiState.polygonPoints.size) {
+                mainUiState.polygonPoints.zipWithNext().forEach { (start, end) ->
                     drawLine(
                         color = Color.Green,
-                        start = mainUiState.polygonPoints[i - 1],
-                        end = mainUiState.polygonPoints[i],
+                        start = start,
+                        end = end,
                         strokeWidth = 3f
                     )
                 }

@@ -32,16 +32,16 @@ class RecentActions @Inject constructor() {
 
     suspend fun undo(): RecentAction? {
         mutex.withLock {
-        val undoData = recentActions.undo()
-        return undoData
+            val undoData = recentActions.undo()
+            return undoData
         }
     }
 
     suspend fun redo(): RecentAction? {
         mutex.withLock {
-        val redoData = recentActions.redo()
-        timber("RecentActionsLog", "Returned with canUndo=${canUndo()}, canRedo=${canRedo()}")
-        return redoData
+            val redoData = recentActions.redo()
+            timber("RecentActionsLog", "Returned with canUndo=${canUndo()}, canRedo=${canRedo()}")
+            return redoData
         }
     }
 
