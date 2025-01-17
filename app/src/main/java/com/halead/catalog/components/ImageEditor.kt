@@ -104,8 +104,31 @@ fun ImageEditor(
                 .pointerInput(currentCursor) {
                     when (currentCursor.type) {
                         CursorTypes.DRAW -> {
-                            detectTapGestures(onPress = { offset ->
+                            /*detectTapGestures(onPress = { offset ->
                                 viewModel.addPolygonPoint(offset)
+                            })*/
+                            detectTapGestures(onPress = { offset ->
+                                val points = mainUiState.polygonPoints
+
+                                if (points.size >= 3) {
+                                    // Find the two closest points to the new offset
+                                    val closestIndex = points.indices.minByOrNull { index ->
+                                        val nextIndex = (index + 1) % points.size
+                                        val segmentMidpoint = (points[index] + points[nextIndex]) / 2F
+                                        (segmentMidpoint - offset).getDistance()
+                                    } ?: return@detectTapGestures
+
+                                    // Insert the new point between the two closest points
+                                    val nextIndex = (closestIndex + 1) % points.size
+                                    val updatedPoints = points.toMutableList()
+                                    updatedPoints.add(nextIndex, offset)
+
+                                    // Update the polygon points in the ViewModel
+                                    viewModel.updatePolygonPoints(updatedPoints)
+                                } else {
+                                    // Add the point normally for the initial shape creation
+                                    viewModel.addPolygonPoint(offset)
+                                }
                             })
                         }
 

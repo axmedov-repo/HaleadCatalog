@@ -21,6 +21,7 @@ interface MainViewModel {
     fun bringHistoryWork(workModel: WorkModel)
     fun addPolygonPoint(offset: Offset)
     fun updatePolygonPoint(index: Int, offset: Offset)
+    fun updatePolygonPoints(newPolygonPoints : List<Offset>)
     fun memorizeUpdatedPolygonPoints()
     fun clearPolygonPoints()
 }

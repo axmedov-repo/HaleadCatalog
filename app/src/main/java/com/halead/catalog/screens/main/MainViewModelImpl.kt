@@ -288,6 +288,14 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
+    override fun updatePolygonPoints(newPolygonPoints: List<Offset>) {
+        viewModelScope.launch {
+            mainUiState.update {
+                it.copy(polygonPoints = newPolygonPoints)
+            }
+        }
+    }
+
     override fun memorizeUpdatedPolygonPoints() {
         viewModelScope.launch {
             mainUiState.update { it.copy() }
