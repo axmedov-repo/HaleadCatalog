@@ -7,6 +7,6 @@ data class OverlayMaterialModel(
     val id: Int = 0, // for work history with OverlayMaterialEntity
     val overlay: Bitmap,
     val material : Int,
-    val regionPoints: List<Offset>,
+    val polygonPoints: List<Offset>,
     var position: Offset = Offset(0f, 0f)
 )

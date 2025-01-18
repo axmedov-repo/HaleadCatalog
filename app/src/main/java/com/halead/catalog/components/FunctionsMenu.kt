@@ -44,9 +44,10 @@ fun FunctionsMenu(
     canUndo: Boolean,
     canRedo: Boolean,
     baseImage: ImageBitmap?,
-    isOverlaysEmpty: Boolean = true,
-    isPolygonPointsEmpty: Boolean = true,
-    selectedCursor: CursorData? = null,
+    isOverlaysEmpty: Boolean,
+    isPolygonPointsEmpty: Boolean,
+    isOverlaySelected: Boolean,
+    selectedCursor: CursorData?,
     onFunctionClicked: (FunctionData) -> Unit,
     onCursorClicked: (CursorData) -> Unit,
 ) {
@@ -70,6 +71,7 @@ fun FunctionsMenu(
                     canRedo = canRedo,
                     isOverlaysEmpty = isOverlaysEmpty,
                     isPolygonPointsEmpty = isPolygonPointsEmpty,
+                    isOverlaySelected = isOverlaySelected,
                     baseImage = baseImage,
                     onFunctionClicked = { onFunctionClicked(functionData) }
                 )
@@ -100,12 +102,13 @@ fun FunctionItem(
     canRedo: Boolean,
     isOverlaysEmpty: Boolean,
     isPolygonPointsEmpty: Boolean,
+    isOverlaySelected: Boolean,
     baseImage: ImageBitmap?,
     onFunctionClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val disabled by remember(
-        data.type, canUndo, canRedo, isOverlaysEmpty, isPolygonPointsEmpty, baseImage
+        data.type, canUndo, canRedo, isOverlaysEmpty, isPolygonPointsEmpty, isOverlaySelected, baseImage
     ) {
         derivedStateOf {
             when (data.type) {
@@ -113,7 +116,7 @@ fun FunctionItem(
                 FunctionsEnum.UNDO -> !canUndo
                 FunctionsEnum.REPLACE_IMAGE -> baseImage == null
                 FunctionsEnum.ADD_LAYER -> isOverlaysEmpty
-                FunctionsEnum.CLEAR_LAYERS -> isOverlaysEmpty && isPolygonPointsEmpty
+                FunctionsEnum.CLEAR_LAYERS -> isPolygonPointsEmpty
                 else -> false
             }
         }

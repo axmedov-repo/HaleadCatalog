@@ -34,7 +34,11 @@ import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.screens.main.MainViewModel
 import com.halead.catalog.screens.main.MainViewModelImpl
 import com.halead.catalog.ui.theme.SelectedItemColor
+import com.halead.catalog.utils.isPointInPolygon
 import com.halead.catalog.utils.timber
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @Composable
 fun ImageEditor(
@@ -51,6 +55,7 @@ fun ImageEditor(
     }
 
     var selectedPointIndex by remember { mutableIntStateOf(-1) }
+    var currentOverlay = remember<Pair<Int, OverlayMaterialModel>?> { null }
 
     Box(
         modifier = modifier
@@ -117,6 +122,15 @@ fun ImageEditor(
                             detectDragGestures(
                                 onDragStart = { offset ->
                                     // Check if the touch is near any of the circles
+                                    CoroutineScope(Dispatchers.Default).launch {
+                                        viewModel.mainUiState.value.overlays.forEachIndexed { index, overlay ->
+                                            if (isPointInPolygon(offset, overlay.polygonPoints)) {
+                                                viewModel.selectOverlay(overlay)
+                                                currentOverlay = Pair(index, overlay)
+                                                return@launch
+                                            }
+                                        }
+                                    }
                                     selectedPointIndex = mainUiState.polygonPoints.indexOfFirst { point ->
                                         (offset - point).getDistance() <= 30f // 8f is the circle radius
                                     }
@@ -128,15 +142,39 @@ fun ImageEditor(
                                             selectedPointIndex,
                                             mainUiState.polygonPoints[selectedPointIndex] + Offset(dragAmount.x, dragAmount.y)
                                         )
+                                        change.consume() // Consume the drag event
+                                    } else if (currentOverlay != null) {
+                                        viewModel.updateCurrentOverlayPosition(
+                                            overlayIndex = currentOverlay!!.first,
+                                            dragAmount = Offset(dragAmount.x, dragAmount.y)
+                                        )
                                     }
-                                    change.consume() // Consume the drag event
                                 },
                                 onDragEnd = {
-                                    selectedPointIndex = -1 // Reset selection
-                                    viewModel.memorizeUpdatedPolygonPoints()
+                                    if (selectedPointIndex != -1 || currentOverlay != null) {
+                                        selectedPointIndex = -1 // Reset selection
+                                        currentOverlay = null
+                                        viewModel.memorizeUpdatedPolygonPoints()
+                                    }
                                 }
                             )
                         }
+                    }
+                }
+                .pointerInput(currentCursor, overlays) {
+                    if (currentCursor.type == CursorTypes.DRAG_PAN) {
+                        detectTapGestures(onTap = { point ->
+                            overlays.forEach { overlay ->
+                            timber("PIP_CHECK", "${isPointInPolygon(point, overlay.polygonPoints)}")
+                                if (isPointInPolygon(point, overlay.polygonPoints)) {
+                                    viewModel.selectOverlay(overlay)
+                                    return@detectTapGestures
+                                }
+                            }
+                            if (mainUiState.polygonPoints.isNotEmpty()) {
+                                viewModel.unselectCurrentOverlay()
+                            }
+                        })
                     }
                 }
         ) {

@@ -33,7 +33,7 @@ class WorkRepositoryImpl @Inject constructor(
                                 id = overlayData.id,
                                 overlay = overlay,
                                 material = overlayData.material,
-                                regionPoints = overlayData.regionPoints,
+                                polygonPoints = overlayData.regionPoints,
                                 position = overlayData.position
                             )
                         }
@@ -64,7 +64,7 @@ class WorkRepositoryImpl @Inject constructor(
                                         "overlayMaterialImage${overlayData.id}"
                                     ),
                                     material = overlayData.material,
-                                    regionPoints = overlayData.regionPoints,
+                                    regionPoints = overlayData.polygonPoints,
                                     position = overlayData.position
                                 )
                             }
@@ -98,7 +98,7 @@ class WorkRepositoryImpl @Inject constructor(
                                         "overlayMaterialImage${overlayData.id}"
                                     ),
                                     material = overlayData.material,
-                                    regionPoints = overlayData.regionPoints,
+                                    regionPoints = overlayData.polygonPoints,
                                     position = overlayData.position
                                 )
                             }

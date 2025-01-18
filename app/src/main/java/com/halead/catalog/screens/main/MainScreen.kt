@@ -85,6 +85,7 @@ fun MainScreen(
                     baseImage = mainUiState.imageBmp,
                     isOverlaysEmpty = mainUiState.overlays.isEmpty(),
                     isPolygonPointsEmpty = mainUiState.polygonPoints.isEmpty(),
+                    isOverlaySelected = mainUiState.currentOverlay != null,
                     selectedCursor = currentCursorState,
                     onFunctionClicked = { function ->
                         if (function.type == FunctionsEnum.REPLACE_IMAGE) {
