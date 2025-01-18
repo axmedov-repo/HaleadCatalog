@@ -4,7 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 
 data class OverlayMaterialModel(
-    val id: Int = 0,
+    val id: Int = 0, // for work history with OverlayMaterialEntity
     val overlay: Bitmap,
     val material : Int,
     val regionPoints: List<Offset>,

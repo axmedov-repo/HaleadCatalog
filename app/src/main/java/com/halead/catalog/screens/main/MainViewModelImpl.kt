@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.halead.catalog.data.RecentAction
 import com.halead.catalog.data.RecentActions
 import com.halead.catalog.data.enums.CursorData
+import com.halead.catalog.data.enums.DefaultCursorData
 import com.halead.catalog.data.enums.FunctionData
 import com.halead.catalog.data.enums.FunctionsEnum
 import com.halead.catalog.data.models.OverlayMaterialModel
@@ -44,7 +45,9 @@ class MainViewModelImpl @Inject constructor(
     private val recentActions: RecentActions
 ) : MainViewModel, ViewModel() {
     override val mainUiState = MutableStateFlow(MainUiState())
-    override val loadingApplyMaterial = MutableStateFlow(false)
+    override val loadingApplyMaterialState = MutableStateFlow(false)
+    override val currentCursorState = MutableStateFlow(DefaultCursorData)
+
     private var isRecentActionSavingEnabled = true
     private var isUndoEnabled: Boolean = true
     private var isRedoEnabled: Boolean = true
@@ -72,19 +75,9 @@ class MainViewModelImpl @Inject constructor(
             }
     }
 
-    /*
     private fun isMaterialApplied(): Boolean {
         val overlayPoints = mainUiState.value.overlays.flatMap { it.regionPoints }
-        return if (overlayPoints.isEmpty() || !mainUiState.value.polygonPoints.all { it in overlayPoints }) {
-            false
-        } else {
-            mainUiState.value.overlays.last().material == mainUiState.value.selectedMaterial
-        }
-    }
-    */
-
-    private fun isMaterialApplied(): Boolean {
-        val overlayPoints = mainUiState.value.overlays.flatMap { it.regionPoints }
+        @Suppress("ConvertArgumentToSet")
         return if (overlayPoints.isEmpty() || (mainUiState.value.polygonPoints.minus(overlayPoints).isNotEmpty())) {
             false
         } else {
@@ -201,15 +194,16 @@ class MainViewModelImpl @Inject constructor(
     }
 
     override fun selectCursor(cursorData: CursorData) {
-        mainUiState.update { it.copy(currentCursor = cursorData) }
+        currentCursorState.update { cursorData }
     }
 
     override fun applyMaterial() {
+        timber("PRIMARY_BUTTON", "TRIGGERED")
         viewModelScope.launch {
             val uiState = mainUiState.value
 
-            if (!uiState.isMaterialApplied && uiState.polygonPoints.isNotEmpty()) {
-                loadingApplyMaterial.value = true
+            if (!uiState.isMaterialApplied && uiState.polygonPoints.size >= 3) {
+                loadingApplyMaterialState.value = true
 
                 val selectedMaterialBmp = uiState.selectedMaterial?.let { material ->
                     mainRepository.getBitmap(material)
@@ -224,7 +218,7 @@ class MainViewModelImpl @Inject constructor(
 
                 timber("Materials", "selectedMaterialBmp=$selectedMaterialBmp")
 
-                if (uiState.polygonPoints.isNotEmpty() && selectedMaterialBmp != null) {
+                if (selectedMaterialBmp != null) {
                     val resizedBitmap = async(Dispatchers.Default) {
                         resizeBitmap(selectedMaterialBmp, 1024, 1024)
                     }
@@ -240,16 +234,17 @@ class MainViewModelImpl @Inject constructor(
                         )
                     }
 
+                    val newOverlay = OverlayMaterialModel(
+                        overlay = appliedMaterialBitmap.await(),
+                        regionPoints = uiState.polygonPoints,
+                        material = uiState.selectedMaterial,
+                        position = offsetOfOverlay.await()
+                    )
+
                     mainUiState.update {
                         it.copy(
-                            overlays = it.overlays.plus(
-                                OverlayMaterialModel(
-                                    overlay = appliedMaterialBitmap.await(),
-                                    regionPoints = uiState.polygonPoints,
-                                    material = uiState.selectedMaterial,
-                                    position = offsetOfOverlay.await()
-                                )
-                            )
+                            overlays = it.overlays.plus(newOverlay),
+                            currentOverlay = newOverlay
                         )
                     }
                 }
@@ -259,11 +254,11 @@ class MainViewModelImpl @Inject constructor(
 
     override fun allOverlaysDrawn() {
         viewModelScope.launch {
-            loadingApplyMaterial.value = false
+            loadingApplyMaterialState.value = false
         }
     }
 
-    override fun addPolygonPoint(offset: Offset) {
+    override fun insertPolygonPoint(offset: Offset) {
         viewModelScope.launch {
             mainUiState.update {
                 it.copy(
@@ -274,24 +269,47 @@ class MainViewModelImpl @Inject constructor(
     }
 
     override fun updatePolygonPoint(index: Int, offset: Offset) {
+        if (index !in mainUiState.value.polygonPoints.indices) return
+
         viewModelScope.launch {
-            if (index in mainUiState.value.polygonPoints.indices) {
-                isRecentActionSavingEnabled = false
-                mainUiState.update {
-                    it.copy(
-                        overlays = emptyList(),
-                        polygonPoints = it.polygonPoints.toPersistentList().set(index, offset)
-                    )
-                }
-                isRecentActionSavingEnabled = true
+            isRecentActionSavingEnabled = false
+            mainUiState.update { state ->
+                state.copy(
+                    overlays = state.currentOverlay?.let { state.overlays - it } ?: state.overlays,
+                    currentOverlay = null,
+                    polygonPoints = state.polygonPoints.toPersistentList().set(index, offset)
+                )
             }
+            isRecentActionSavingEnabled = true
         }
     }
 
-    override fun updatePolygonPoints(newPolygonPoints: List<Offset>) {
+    override fun extendPolygonPoints(offset: Offset) {
         viewModelScope.launch {
-            mainUiState.update {
-                it.copy(polygonPoints = newPolygonPoints)
+            val points = mainUiState.value.polygonPoints
+
+            if (points.size >= 3) {
+                // Find the two closest points to the new offset
+                val closestIndex = points.indices.minByOrNull { index ->
+                    val nextIndex = (index + 1) % points.size
+                    val segmentMidpoint = (points[index] + points[nextIndex]) / 2F
+                    (segmentMidpoint - offset).getDistance()
+                } ?: return@launch
+
+                // Insert the new point between the two closest points
+                val nextIndex = (closestIndex + 1) % points.size
+
+                // Update the polygon points in the ViewModel
+                mainUiState.update { state ->
+                    state.copy(
+                        overlays = state.currentOverlay?.let { state.overlays - it } ?: state.overlays,
+                        currentOverlay = null,
+                        polygonPoints = state.polygonPoints.toPersistentList().add(nextIndex, offset)
+                    )
+                }
+            } else {
+                // Add the point normally for the initial shape creation
+                insertPolygonPoint(offset)
             }
         }
     }
@@ -329,7 +347,7 @@ class MainViewModelImpl @Inject constructor(
         if (newState != mainUiState.value) {
             mainUiState.update {
                 if (newState.overlays.isNotEmpty() && newState.overlays != mainUiState.value.overlays) {
-                    loadingApplyMaterial.value = true
+                    loadingApplyMaterialState.value = true
                 }
                 newState
             }

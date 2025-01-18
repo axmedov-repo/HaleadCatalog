@@ -3,7 +3,7 @@ package com.halead.catalog.data.enums
 import com.halead.catalog.R
 
 enum class CursorTypes {
-    DRAW, HAND
+    DRAW_INSERT, DRAW_EXTEND, DRAG_PAN
 }
 
 data class CursorData(
@@ -14,19 +14,24 @@ data class CursorData(
 
 val DefaultCursorData = CursorData(
     img = R.drawable.ic_control_point,
-    text = "Draw",
-    type = CursorTypes.DRAW
+    text = "Draw Insert",
+    type = CursorTypes.DRAW_INSERT
 )
 
 val cursorTypesList = listOf(
     CursorData(
         img = R.drawable.ic_control_point,
-        text = "Draw",
-        type = CursorTypes.DRAW
+        text = "Draw Insert",
+        type = CursorTypes.DRAW_INSERT
     ),
     CursorData(
-        img = R.drawable.ic_swipe,
-        text = "Hand",
-        type = CursorTypes.HAND
+        img = R.drawable.ic_resize,
+        text = "Draw Extend",
+        type = CursorTypes.DRAW_EXTEND
+    ),
+    CursorData(
+        img = R.drawable.ic_drag_pan,
+        text = "Drag Pan",
+        type = CursorTypes.DRAG_PAN
     )
 )

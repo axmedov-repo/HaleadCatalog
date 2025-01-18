@@ -35,7 +35,6 @@ import com.halead.catalog.screens.main.MainViewModel
 import com.halead.catalog.screens.main.MainViewModelImpl
 import com.halead.catalog.ui.theme.SelectedItemColor
 import com.halead.catalog.utils.timber
-import kotlin.math.abs
 
 @Composable
 fun ImageEditor(
@@ -46,7 +45,6 @@ fun ImageEditor(
     viewModel: MainViewModel = viewModel<MainViewModelImpl>()
 ) {
     val mainUiState by viewModel.mainUiState.collectAsState()
-
 
     val aspectRatio by remember(imageBitmap) {
         derivedStateOf { imageBitmap.width.toFloat() / imageBitmap.height.toFloat() }
@@ -103,36 +101,19 @@ fun ImageEditor(
                 .clip(RoundedCornerShape(8.dp))
                 .pointerInput(currentCursor) {
                     when (currentCursor.type) {
-                        CursorTypes.DRAW -> {
-                            /*detectTapGestures(onPress = { offset ->
-                                viewModel.addPolygonPoint(offset)
-                            })*/
+                        CursorTypes.DRAW_INSERT -> {
                             detectTapGestures(onPress = { offset ->
-                                val points = mainUiState.polygonPoints
-
-                                if (points.size >= 3) {
-                                    // Find the two closest points to the new offset
-                                    val closestIndex = points.indices.minByOrNull { index ->
-                                        val nextIndex = (index + 1) % points.size
-                                        val segmentMidpoint = (points[index] + points[nextIndex]) / 2F
-                                        (segmentMidpoint - offset).getDistance()
-                                    } ?: return@detectTapGestures
-
-                                    // Insert the new point between the two closest points
-                                    val nextIndex = (closestIndex + 1) % points.size
-                                    val updatedPoints = points.toMutableList()
-                                    updatedPoints.add(nextIndex, offset)
-
-                                    // Update the polygon points in the ViewModel
-                                    viewModel.updatePolygonPoints(updatedPoints)
-                                } else {
-                                    // Add the point normally for the initial shape creation
-                                    viewModel.addPolygonPoint(offset)
-                                }
+                                viewModel.insertPolygonPoint(offset)
                             })
                         }
 
-                        CursorTypes.HAND -> {
+                        CursorTypes.DRAW_EXTEND -> {
+                            detectTapGestures(onPress = { offset ->
+                                viewModel.extendPolygonPoints(offset)
+                            })
+                        }
+
+                        CursorTypes.DRAG_PAN -> {
                             detectDragGestures(
                                 onDragStart = { offset ->
                                     // Check if the touch is near any of the circles
@@ -159,7 +140,16 @@ fun ImageEditor(
                     }
                 }
         ) {
-            if (mainUiState.polygonPoints.isNotEmpty()) {
+            if (mainUiState.polygonPoints.size > 1) {
+                drawLine(
+                    color = Color.Green,
+                    start = mainUiState.polygonPoints.last(),
+                    end = mainUiState.polygonPoints.first(),
+                    strokeWidth = 3f
+                )
+            }
+
+            if (mainUiState.polygonPoints.size > 2) {
                 mainUiState.polygonPoints.zipWithNext().forEach { (start, end) ->
                     drawLine(
                         color = Color.Green,
@@ -168,16 +158,9 @@ fun ImageEditor(
                         strokeWidth = 3f
                     )
                 }
+            }
 
-                if (mainUiState.polygonPoints.size > 1) {
-                    drawLine(
-                        color = Color.Green,
-                        start = mainUiState.polygonPoints.last(),
-                        end = mainUiState.polygonPoints.first(),
-                        strokeWidth = 3f
-                    )
-                }
-
+            if (mainUiState.polygonPoints.isNotEmpty()) {
                 mainUiState.polygonPoints.forEach { point ->
                     drawCircle(color = SelectedItemColor, center = point, radius = 8f)
                 }

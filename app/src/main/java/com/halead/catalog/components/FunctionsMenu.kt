@@ -45,6 +45,7 @@ fun FunctionsMenu(
     canRedo: Boolean,
     baseImage: ImageBitmap?,
     isOverlaysEmpty: Boolean = true,
+    isPolygonPointsEmpty: Boolean = true,
     selectedCursor: CursorData? = null,
     onFunctionClicked: (FunctionData) -> Unit,
     onCursorClicked: (CursorData) -> Unit,
@@ -68,6 +69,7 @@ fun FunctionsMenu(
                     canUndo = canUndo,
                     canRedo = canRedo,
                     isOverlaysEmpty = isOverlaysEmpty,
+                    isPolygonPointsEmpty = isPolygonPointsEmpty,
                     baseImage = baseImage,
                     onFunctionClicked = { onFunctionClicked(functionData) }
                 )
@@ -84,7 +86,7 @@ fun FunctionsMenu(
                     data = cursorData,
                     selectedData = selectedCursor,
                     baseImage = baseImage,
-                    onFunctionClicked = { onCursorClicked(cursorData) }
+                    onCursorClicked = { onCursorClicked(cursorData) }
                 )
             }
         }
@@ -97,23 +99,27 @@ fun FunctionItem(
     canUndo: Boolean,
     canRedo: Boolean,
     isOverlaysEmpty: Boolean,
+    isPolygonPointsEmpty: Boolean,
     baseImage: ImageBitmap?,
     onFunctionClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val disabled by remember(
-        data.type, canUndo, canRedo, isOverlaysEmpty, baseImage
+        data.type, canUndo, canRedo, isOverlaysEmpty, isPolygonPointsEmpty, baseImage
     ) {
         derivedStateOf {
             when (data.type) {
                 FunctionsEnum.REDO -> !canRedo
                 FunctionsEnum.UNDO -> !canUndo
-                FunctionsEnum.REPLACE_IMAGE, FunctionsEnum.ADD_LAYER -> baseImage == null
-                FunctionsEnum.CLEAR_LAYERS -> isOverlaysEmpty
+                FunctionsEnum.REPLACE_IMAGE -> baseImage == null
+                FunctionsEnum.ADD_LAYER -> isOverlaysEmpty
+                FunctionsEnum.CLEAR_LAYERS -> isOverlaysEmpty && isPolygonPointsEmpty
                 else -> false
             }
         }
     }
+
+    val alpha = remember(disabled) { if (disabled) 0.4f else 1.0f }
 
     Image(
         modifier = modifier
@@ -129,7 +135,7 @@ fun FunctionItem(
         contentDescription = null,
         colorFilter = ColorFilter.tint(Color.White),
         painter = painterResource(data.img),
-        alpha = if (disabled) 0.4f else 1.0f
+        alpha = alpha
     )
 }
 
@@ -138,23 +144,32 @@ fun CursorItem(
     data: CursorData,
     selectedData: CursorData?,
     baseImage: ImageBitmap?,
-    onFunctionClicked: () -> Unit,
+    onCursorClicked: (CursorData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val background by remember(selectedData?.type, data.type, baseImage) {
+        derivedStateOf {
+            if (selectedData?.type == data.type && baseImage != null) SelectedItemColor else Color.Gray
+        }
+    }
+
+    val enabled by remember(baseImage) { derivedStateOf { baseImage != null } }
+    val alpha = remember(enabled) { if (enabled) 1.0f else 0.4f }
+
     Image(
         modifier = modifier
             .size(50.dp)
             .aspectRatio(1f)
             .shadow(4.dp, RoundedCornerShape(8.dp))
             .clip(shape = RoundedCornerShape(8.dp))
-            .background(if (selectedData == data && baseImage != null) SelectedItemColor else Color.Gray)
+            .background(background)
             .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp))
-            .clickable(enabled = baseImage != null) { onFunctionClicked() }
+            .clickable(enabled = enabled) { onCursorClicked(data) }
             .padding(8.dp),
         contentScale = ContentScale.Crop,
         contentDescription = null,
         colorFilter = ColorFilter.tint(Color.White),
         painter = painterResource(data.img),
-        alpha = if (baseImage == null) 0.4f else 1.0f
+        alpha = alpha
     )
 }
