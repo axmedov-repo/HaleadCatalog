@@ -65,6 +65,10 @@ fun timber(tag: String = "TTT", message: String) {
     Timber.tag(tag).d(message)
 }
 
+fun timberE(message: String) {
+    Timber.e(message)
+}
+
 fun <T> Stack<T>.peekOrNull(): T? {
     return if (this.isEmpty()) null else this.peek()
 }

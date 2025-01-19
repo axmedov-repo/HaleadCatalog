@@ -22,6 +22,7 @@ import com.halead.catalog.utils.getClippedMaterial
 import com.halead.catalog.utils.getTemporaryClippedOverlay
 import com.halead.catalog.utils.resizeBitmap
 import com.halead.catalog.utils.timber
+import com.halead.catalog.utils.timberE
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Dispatchers
@@ -270,7 +271,6 @@ class MainViewModelImpl @Inject constructor(
     }
 
     override fun applyMaterial() {
-        timber("PRIMARY_BUTTON", "TRIGGERED")
         viewModelScope.launch {
             val uiState = mainUiState.value
 
@@ -279,13 +279,13 @@ class MainViewModelImpl @Inject constructor(
 
                 val selectedMaterialBmp = uiState.selectedMaterial?.let { material ->
                     mainRepository.getBitmap(material)
-                        .onEach { result ->
-                            result.onFailure { error ->
-                                timber("Error", "Failed to fetch bitmap: ${error.message}")
-                            }
-                        }
-                        .mapNotNull { it.getOrNull() }
+                        .filter { it.isSuccess } // Emit only successful results
+                        .mapNotNull { it.getOrNull() } // Safely map non-null values
                         .firstOrNull()
+                        ?: run {
+                            timberE("No valid bitmap could be fetched.")
+                            null
+                        }
                 }
 
                 timber("Materials", "selectedMaterialBmp=$selectedMaterialBmp")
@@ -301,7 +301,8 @@ class MainViewModelImpl @Inject constructor(
 
                     val appliedMaterialBitmap = async(Dispatchers.Default) {
                         getClippedMaterial(
-                            materialBitmap = resizedBitmap.await(),
+                            // Unnecessary to use resizedBitmap here, this function itself resizes the material.
+                            materialBitmap = selectedMaterialBmp,
                             regionPoints = uiState.polygonPoints
                         )
                     }
@@ -313,11 +314,22 @@ class MainViewModelImpl @Inject constructor(
                         position = offsetOfOverlay.await()
                     )
 
-                    mainUiState.update {
-                        it.copy(
-                            overlays = it.overlays.plus(newOverlay),
-                            currentOverlay = newOverlay
-                        )
+                    if (mainUiState.value.currentOverlay != null && mainUiState.value.currentOverlay!!.polygonPoints == newOverlay.polygonPoints) {
+                        mainUiState.value.overlays.indexOf(mainUiState.value.currentOverlay).takeIf { it != -1 }?.let { index ->
+                            mainUiState.update { state ->
+                                state.copy(
+                                    overlays = state.overlays.toPersistentList().set(index, newOverlay),
+                                    currentOverlay = newOverlay
+                                )
+                            }
+                        }
+                    } else {
+                        mainUiState.update {
+                            it.copy(
+                                overlays = it.overlays.plus(newOverlay),
+                                currentOverlay = newOverlay
+                            )
+                        }
                     }
                 }
             }
