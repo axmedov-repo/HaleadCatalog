@@ -8,5 +8,5 @@ data class OverlayMaterialModel(
     val overlay: Bitmap,
     val material : Int,
     val polygonPoints: List<Offset>,
-    var position: Offset = Offset(0f, 0f)
+    val position: Offset = Offset(0f, 0f)
 )

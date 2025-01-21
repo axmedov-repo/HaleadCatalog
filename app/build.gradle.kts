@@ -17,7 +17,6 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -60,12 +59,8 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(libs.androidx.ui.tooling)
 
-    // openCV
-//    implementation(libs.opencv)
-
-    // camera
-//    implementation(libs.androidx.camera.core)
-//    implementation(libs.androidx.camera.view)
+    // open cv
+    implementation(libs.opencv)
 
     // glide
     implementation(libs.glide)
@@ -93,4 +88,7 @@ dependencies {
 
     // Lotti animations
     implementation(libs.lottie.compose)
+
+    // SMILE - Statistical Machine Intelligence and Learning Engine
+    implementation(libs.smile.kotlin)
 }

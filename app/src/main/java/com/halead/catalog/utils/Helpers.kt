@@ -10,11 +10,25 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import timber.log.Timber
 import java.util.Stack
+import kotlin.math.acos
+import kotlin.math.max
 
 suspend fun findMinOffset(regionPoints: List<Offset>): Offset = coroutineScope {
     val minX = async { regionPoints.minOf { it.x } }
     val minY = async { regionPoints.minOf { it.y } }
     return@coroutineScope Offset(minX.await(), minY.await())
+}
+
+fun findMinOffset2(regionPoints: List<Offset>): Offset {
+    val minX =  regionPoints.minOf { it.x }
+    val minY =  regionPoints.minOf { it.y }
+    return Offset(minX, minY)
+}
+
+ fun findMaxOffset(regionPoints: List<Offset>): Offset {
+    val maxX =  regionPoints.maxOf { it.x }
+    val maxY =  regionPoints.maxOf { it.y }
+    return Offset(maxX, maxY)
 }
 
 fun getRegionSize(regionPoints: List<Offset>): Size {

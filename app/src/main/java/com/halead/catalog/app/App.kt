@@ -4,10 +4,12 @@ import android.app.Application
 import com.halead.catalog.BuildConfig
 import com.halead.catalog.data.DataProvider
 import com.halead.catalog.data.cache.BitmapCacheManager
+import com.halead.catalog.utils.timber
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.opencv.android.OpenCVLoader
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -25,11 +27,11 @@ class App : Application() {
             bitmapCacheManager.cacheLocalImages(dataProvider.materialsResIds)
         }
         // Initialize OpenCV
-        /* if (!OpenCVLoader.initDebug()) {
+         if (!OpenCVLoader.initDebug()) {
             timber("OpenCV", "OpenCV initialization failed")
          } else {
              timber("OpenCV", "OpenCV initialized successfully")
-         }*/
+         }
 
         // Initialize Timber
         if (BuildConfig.DEBUG) {

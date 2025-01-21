@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -24,8 +23,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.halead.catalog.data.enums.CursorData
@@ -36,6 +37,7 @@ import com.halead.catalog.screens.main.MainViewModelImpl
 import com.halead.catalog.ui.theme.SelectedItemColor
 import com.halead.catalog.utils.isPointInPolygon
 import com.halead.catalog.utils.timber
+import com.halead.catalog.utils.transformMaterialToPolygon
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,7 +51,7 @@ fun ImageEditor(
     viewModel: MainViewModel = viewModel<MainViewModelImpl>()
 ) {
     val mainUiState by viewModel.mainUiState.collectAsState()
-
+    val context = LocalContext.current
     val aspectRatio by remember(imageBitmap) {
         derivedStateOf { imageBitmap.width.toFloat() / imageBitmap.height.toFloat() }
     }
@@ -76,25 +78,30 @@ fun ImageEditor(
                 .clip(RoundedCornerShape(8.dp))
         )
 
-        if (overlays.isNotEmpty()) {
-            // Draw overlays
-            Canvas(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clip(RoundedCornerShape(8.dp))
-            ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
+            if (overlays.isNotEmpty()) {
                 overlays.forEach { overlay ->
-                    drawImage(overlay.overlay.asImageBitmap(), topLeft = overlay.position)
-                }
-            }
+                    val processedBitmap = remember(overlay.material, overlay.polygonPoints) {
+                        transformMaterialToPolygon(
+                            context,
+                            overlay.material,
+                            overlay.polygonPoints
+                        )
+                    }
 
-            LaunchedEffect(overlays) {
-                timber("allOverlaysDrawn", "allOverlaysDrawn called")
-                viewModel.allOverlaysDrawn()
-            }
-        } else {
-            LaunchedEffect(overlays) {
-                timber("allOverlaysDrawn", "allOverlaysDrawn called")
+                    Image(
+                        bitmap = processedBitmap.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .graphicsLayer(
+                                translationX = overlay.position.x,
+                                translationY = overlay.position.y,
+                                // Add clip to ensure the transformed bitmap stays within bounds
+//                                clip = true
+                            ),
+                        contentScale = ContentScale.None  // Changed from None to FillBounds
+                    )
+                }
                 viewModel.allOverlaysDrawn()
             }
         }
@@ -165,7 +172,7 @@ fun ImageEditor(
                     if (currentCursor.type == CursorTypes.DRAG_PAN) {
                         detectTapGestures(onTap = { point ->
                             overlays.forEach { overlay ->
-                            timber("PIP_CHECK", "${isPointInPolygon(point, overlay.polygonPoints)}")
+                                timber("PIP_CHECK", "${isPointInPolygon(point, overlay.polygonPoints)}")
                                 if (isPointInPolygon(point, overlay.polygonPoints)) {
                                     viewModel.selectOverlay(overlay)
                                     return@detectTapGestures
