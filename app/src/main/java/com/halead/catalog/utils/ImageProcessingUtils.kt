@@ -82,29 +82,3 @@ fun getBitmapFromUri(context: Context, uri: Uri?): Bitmap? {
 fun getBitmapFromResource(context: Context, resourceId: Int): Bitmap? {
     return BitmapFactory.decodeResource(context.resources, resourceId)
 }
-
-fun getDownscaledBitmapFromResource(context: Context, resourceId: Int): Bitmap? {
-    val options = BitmapFactory.Options().apply {
-        inJustDecodeBounds = true // Load dimensions only
-    }
-
-    BitmapFactory.decodeResource(context.resources, resourceId, options)
-
-    options.inSampleSize = calculateInSampleSize(options, 512, 512) // Resize to 512x512
-    options.inJustDecodeBounds = false
-
-    return BitmapFactory.decodeResource(context.resources, resourceId, options)
-}
-
-private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
-    val (height: Int, width: Int) = options.outHeight to options.outWidth
-    var inSampleSize = 1
-    if (height > reqHeight || width > reqWidth) {
-        val halfHeight = height / 2
-        val halfWidth = width / 2
-        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
-            inSampleSize *= 2
-        }
-    }
-    return inSampleSize
-}

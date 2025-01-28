@@ -14,7 +14,6 @@ class DataProvider @Inject constructor() {
 
     val materialsResIds = listOf<Int>(
         R.drawable.material,
-        R.drawable.material7,
         R.drawable.material1,
         R.drawable.material2,
         R.drawable.material3

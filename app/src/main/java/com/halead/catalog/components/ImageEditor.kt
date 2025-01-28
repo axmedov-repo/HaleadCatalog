@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -37,7 +38,6 @@ import com.halead.catalog.screens.main.MainViewModelImpl
 import com.halead.catalog.ui.theme.SelectedItemColor
 import com.halead.catalog.utils.isPointInPolygon
 import com.halead.catalog.utils.timber
-import com.halead.catalog.utils.transformMaterialToPolygon
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,14 +61,13 @@ fun ImageEditor(
 
     Box(
         modifier = modifier
-            .aspectRatio(aspectRatio) // Maintain aspect ratio
+            .aspectRatio(aspectRatio)
             .fillMaxSize()
-            .padding(8.dp)
-            .clip(RoundedCornerShape(8.dp)),
+            .padding(8.dp),
         contentAlignment = Alignment.Center
     ) {
 
-        // Base image with aspect ratio scaling
+        // Base Image
         Image(
             bitmap = imageBitmap,
             contentDescription = null,
@@ -78,31 +77,28 @@ fun ImageEditor(
                 .clip(RoundedCornerShape(8.dp))
         )
 
+        // Overlays
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
             if (overlays.isNotEmpty()) {
                 overlays.forEach { overlay ->
-                    val processedBitmap = remember(overlay.material, overlay.polygonPoints) {
-                        transformMaterialToPolygon(
-                            context,
-                            overlay.material,
-                            overlay.polygonPoints
-                        )
-                    }
-
                     Image(
-                        bitmap = processedBitmap.asImageBitmap(),
+                        bitmap = overlay.overlay.asImageBitmap(),
                         contentDescription = null,
                         modifier = Modifier
                             .graphicsLayer(
                                 translationX = overlay.position.x,
-                                translationY = overlay.position.y,
-                                // Add clip to ensure the transformed bitmap stays within bounds
-//                                clip = true
+                                translationY = overlay.position.y
                             ),
-                        contentScale = ContentScale.None  // Changed from None to FillBounds
+                        contentScale = ContentScale.None
                     )
                 }
-                viewModel.allOverlaysDrawn()
+                LaunchedEffect(overlays) {
+                    viewModel.allOverlaysDrawn()
+                }
+            } else {
+                LaunchedEffect(overlays) {
+                    viewModel.allOverlaysDrawn()
+                }
             }
         }
 
@@ -130,7 +126,9 @@ fun ImageEditor(
                                 onDragStart = { offset ->
                                     // Check if the touch is near any of the circles
                                     CoroutineScope(Dispatchers.Default).launch {
-                                        viewModel.mainUiState.value.overlays.forEachIndexed { index, overlay ->
+                                        val latestOverlays = viewModel.mainUiState.value.overlays
+                                        for (index in latestOverlays.size - 1 downTo 0) {
+                                            val overlay = latestOverlays[index]
                                             if (isPointInPolygon(offset, overlay.polygonPoints)) {
                                                 viewModel.selectOverlay(overlay)
                                                 currentOverlay = Pair(index, overlay)
@@ -171,7 +169,8 @@ fun ImageEditor(
                 .pointerInput(currentCursor, overlays) {
                     if (currentCursor.type == CursorTypes.DRAG_PAN) {
                         detectTapGestures(onTap = { point ->
-                            overlays.forEach { overlay ->
+                            for (index in overlays.size - 1 downTo 0) {
+                                val overlay = overlays[index]
                                 timber("PIP_CHECK", "${isPointInPolygon(point, overlay.polygonPoints)}")
                                 if (isPointInPolygon(point, overlay.polygonPoints)) {
                                     viewModel.selectOverlay(overlay)

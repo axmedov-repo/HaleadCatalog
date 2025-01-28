@@ -17,10 +17,9 @@ import com.halead.catalog.data.states.MainUiState
 import com.halead.catalog.data.states.toMaterialDependentState
 import com.halead.catalog.data.states.toTrackedState
 import com.halead.catalog.repository.main.MainRepository
+import com.halead.catalog.utils.applyMaterialToPolygon
 import com.halead.catalog.utils.findMinOffset
-import com.halead.catalog.utils.getClippedMaterial
 import com.halead.catalog.utils.getTemporaryClippedOverlay
-import com.halead.catalog.utils.resizeBitmap
 import com.halead.catalog.utils.timber
 import com.halead.catalog.utils.timberE
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -78,12 +77,12 @@ class MainViewModelImpl @Inject constructor(
     }
 
     private fun isMaterialApplied(): Boolean {
-        val overlayPoints = mainUiState.value.overlays.flatMap { it.polygonPoints }
+        val overlayPoints = mainUiState.value.currentOverlay?.polygonPoints ?: return false
         @Suppress("ConvertArgumentToSet")
         return if (overlayPoints.isEmpty() || (mainUiState.value.polygonPoints.minus(overlayPoints).isNotEmpty())) {
             false
         } else {
-            mainUiState.value.overlays.last().material == mainUiState.value.selectedMaterial
+            mainUiState.value.currentOverlay?.material == mainUiState.value.selectedMaterial
         }
     }
 
@@ -225,7 +224,8 @@ class MainViewModelImpl @Inject constructor(
             mainUiState.update {
                 it.copy(
                     polygonPoints = overlay.polygonPoints,
-                    currentOverlay = overlay
+                    currentOverlay = overlay,
+                    selectedMaterial = overlay.material
                 )
             }
         }
@@ -239,7 +239,8 @@ class MainViewModelImpl @Inject constructor(
             mainUiState.update {
                 it.copy(
                     currentOverlay = null,
-                    polygonPoints = emptyList()
+                    polygonPoints = emptyList(),
+                    selectedMaterial = null
                 )
             }
         }
@@ -291,19 +292,14 @@ class MainViewModelImpl @Inject constructor(
                 timber("Materials", "selectedMaterialBmp=$selectedMaterialBmp")
 
                 if (selectedMaterialBmp != null) {
-                    val resizedBitmap = async(Dispatchers.Default) {
-                        resizeBitmap(selectedMaterialBmp, 1024, 1024)
-                    }
-
                     val offsetOfOverlay = async(Dispatchers.Default) {
                         findMinOffset(uiState.polygonPoints)
                     }
 
                     val appliedMaterialBitmap = async(Dispatchers.Default) {
-                        getClippedMaterial(
-                            // Unnecessary to use resizedBitmap here, this function itself resizes the material.
-                            materialBitmap = selectedMaterialBmp,
-                            regionPoints = uiState.polygonPoints
+                        applyMaterialToPolygon(
+                            polygonPoints = uiState.polygonPoints,
+                            materialBitmap = selectedMaterialBmp
                         )
                     }
 
@@ -338,6 +334,7 @@ class MainViewModelImpl @Inject constructor(
 
     override fun allOverlaysDrawn() {
         viewModelScope.launch {
+            timber("allOverlaysDrawn", "allOverlaysDrawn called")
             loadingApplyMaterialState.value = false
         }
     }

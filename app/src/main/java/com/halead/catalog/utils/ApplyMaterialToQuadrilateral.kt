@@ -1,6 +1,5 @@
 package com.halead.catalog.utils
 
-import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import org.opencv.android.Utils
@@ -10,12 +9,17 @@ import org.opencv.core.Point
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 
-fun transformMaterialToPolygon(
-    context: Context,
-    materialResId: Int,
+/**
+ * Applying material with perspective to only quadrilateral shapes which has only 4 vertices.
+ */
+
+fun applyMaterialToQuadrilateral(
+    materialBitmap: Bitmap,
     polygonPoints: List<Offset>
 ): Bitmap {
-    val materialBitmap = getBitmapFromResource(context, materialResId)!!
+    if (polygonPoints.size < 3) {
+        return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    }
 
     // Calculate bounding box
     val minX = polygonPoints.minOf { it.x }
@@ -25,6 +29,10 @@ fun transformMaterialToPolygon(
 
     val width = maxX - minX
     val height = maxY - minY
+
+    if (width <= 0 || height <= 0) {
+        return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    }
 
     // Create source points from material bitmap
     val srcPoints = MatOfPoint2f(
@@ -44,12 +52,12 @@ fun transformMaterialToPolygon(
         })
     }
 
+    // Calculate transformation matrix
+    val transformMatrix = Imgproc.getPerspectiveTransform(srcPoints, dstPoints)
+
     // Convert material bitmap to Mat
     val materialMat = Mat()
     Utils.bitmapToMat(materialBitmap, materialMat)
-
-    // Calculate transformation matrix
-    val transformMatrix = Imgproc.getPerspectiveTransform(srcPoints, dstPoints)
 
     // Create output Mat and apply transformation
     val outputMat = Mat()
