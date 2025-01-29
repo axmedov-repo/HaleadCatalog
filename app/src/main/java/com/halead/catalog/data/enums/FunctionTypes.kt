@@ -3,7 +3,7 @@ package com.halead.catalog.data.enums
 import com.halead.catalog.R
 
 enum class FunctionsEnum {
-    REPLACE_IMAGE, UNDO, REDO, ADD_LAYER, CLEAR_LAYERS
+    RESET_IMAGE, UNDO, REDO, ADD_LAYER, CLEAR_LAYERS, REMOVE_SELECTION, MOVE_TO_BACK, MOVE_TO_FRONT
 }
 
 data class FunctionData(
@@ -15,8 +15,8 @@ data class FunctionData(
 val functionsList = listOf(
     FunctionData(
         img = R.drawable.ic_reset_image,
-        text = "Replace",
-        type = FunctionsEnum.REPLACE_IMAGE
+        text = "Reset Image",
+        type = FunctionsEnum.RESET_IMAGE
     ),
     FunctionData(
         img = R.drawable.ic_undo,
@@ -29,13 +29,28 @@ val functionsList = listOf(
         type = FunctionsEnum.REDO
     ),
     FunctionData(
-        img = R.drawable.ic_layer_add,
+        img = R.drawable.ic_add_layer,
         text = "Add Layer",
         type = FunctionsEnum.ADD_LAYER
     ),
     FunctionData(
-        img = R.drawable.ic_layers_clear,
+        img = R.drawable.ic_clear_layers,
         text = "Clear Layers",
         type = FunctionsEnum.CLEAR_LAYERS
+    ),
+    FunctionData(
+        img = R.drawable.ic_remove_selection,
+        text = "Remove Selection",
+        type = FunctionsEnum.REMOVE_SELECTION
+    ),
+    FunctionData(
+        img = R.drawable.ic_move_to_back,
+        text = "Move To Back",
+        type = FunctionsEnum.MOVE_TO_BACK
+    ),
+    FunctionData(
+        img = R.drawable.ic_move_to_front,
+        text = "Move To Front",
+        type = FunctionsEnum.MOVE_TO_FRONT
     )
 )

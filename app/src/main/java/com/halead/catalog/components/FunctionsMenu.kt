@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
@@ -45,7 +46,7 @@ fun FunctionsMenu(
     canRedo: Boolean,
     baseImage: ImageBitmap?,
     isOverlaysEmpty: Boolean,
-    isPolygonPointsEmpty: Boolean,
+    polygonPoints: List<Offset>,
     isOverlaySelected: Boolean,
     selectedCursor: CursorData?,
     onFunctionClicked: (FunctionData) -> Unit,
@@ -70,7 +71,7 @@ fun FunctionsMenu(
                     canUndo = canUndo,
                     canRedo = canRedo,
                     isOverlaysEmpty = isOverlaysEmpty,
-                    isPolygonPointsEmpty = isPolygonPointsEmpty,
+                    polygonPoints = polygonPoints,
                     isOverlaySelected = isOverlaySelected,
                     baseImage = baseImage,
                     onFunctionClicked = { onFunctionClicked(functionData) }
@@ -101,23 +102,23 @@ fun FunctionItem(
     canUndo: Boolean,
     canRedo: Boolean,
     isOverlaysEmpty: Boolean,
-    isPolygonPointsEmpty: Boolean,
+    polygonPoints: List<Offset>,
     isOverlaySelected: Boolean,
     baseImage: ImageBitmap?,
     onFunctionClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val disabled by remember(
-        data.type, canUndo, canRedo, isOverlaysEmpty, isPolygonPointsEmpty, isOverlaySelected, baseImage
+        data.type, canUndo, canRedo, isOverlaysEmpty, polygonPoints.size, isOverlaySelected, baseImage
     ) {
         derivedStateOf {
             when (data.type) {
                 FunctionsEnum.REDO -> !canRedo
                 FunctionsEnum.UNDO -> !canUndo
-                FunctionsEnum.REPLACE_IMAGE -> baseImage == null
                 FunctionsEnum.ADD_LAYER -> isOverlaysEmpty
-                FunctionsEnum.CLEAR_LAYERS -> isPolygonPointsEmpty
-                else -> false
+                FunctionsEnum.CLEAR_LAYERS -> polygonPoints.isEmpty()
+                FunctionsEnum.REMOVE_SELECTION -> isOverlaysEmpty || polygonPoints.size < 3 || isOverlaySelected
+                else -> baseImage == null
             }
         }
     }

@@ -18,8 +18,10 @@ import com.halead.catalog.data.states.toMaterialDependentState
 import com.halead.catalog.data.states.toTrackedState
 import com.halead.catalog.repository.main.MainRepository
 import com.halead.catalog.utils.applyMaterialToPolygon
+import com.halead.catalog.utils.applyMaterialToPolygonWithHoles
 import com.halead.catalog.utils.findMinOffset
 import com.halead.catalog.utils.getTemporaryClippedOverlay
+import com.halead.catalog.utils.isPointInPolygon
 import com.halead.catalog.utils.timber
 import com.halead.catalog.utils.timberE
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -197,6 +199,33 @@ class MainViewModelImpl @Inject constructor(
                     }
                 }
 
+                FunctionsEnum.REMOVE_SELECTION -> {
+                    mainUiState.value.polygonPoints.takeIf { it.isNotEmpty() }?.let { polygonPoints ->
+                        var editingOverlay: OverlayMaterialModel? = null
+                        var editingOverlayIndex: Int = -1
+                        for (index in mainUiState.value.overlays.size - 1 downTo 0) {
+                            val overlay = mainUiState.value.overlays[index]
+                            if (isPointInPolygon(polygonPoints.first(), overlay.polygonPoints)) {
+                                editingOverlay = overlay
+                                editingOverlayIndex = index
+                                break
+                            }
+                        }
+
+                        editingOverlay?.let {
+                            applyMaterialWithHole(editingOverlay, editingOverlayIndex, polygonPoints)
+                        }
+                    }
+                }
+
+                FunctionsEnum.MOVE_TO_BACK -> {
+
+                }
+
+                FunctionsEnum.MOVE_TO_FRONT -> {
+
+                }
+
                 else -> {}
             }
         }
@@ -326,6 +355,52 @@ class MainViewModelImpl @Inject constructor(
                                 currentOverlay = newOverlay
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun applyMaterialWithHole(editingOverlay: OverlayMaterialModel, index: Int, holePoints: List<Offset>) {
+        viewModelScope.launch {
+            if (holePoints.size >= 3) {
+                loadingApplyMaterialState.value = true
+
+                val selectedMaterialBmp = editingOverlay.material.let { material ->
+                    mainRepository.getBitmap(material)
+                        .filter { it.isSuccess } // Emit only successful results
+                        .mapNotNull { it.getOrNull() } // Safely map non-null values
+                        .firstOrNull()
+                        ?: run {
+                            timberE("No valid bitmap could be fetched.")
+                            null
+                        }
+                }
+
+                timber("Materials", "selectedMaterialBmp=$selectedMaterialBmp")
+
+                if (selectedMaterialBmp != null) {
+                    val appliedMaterialBitmap = async(Dispatchers.Default) {
+                        applyMaterialToPolygonWithHoles(
+                            outerPolygon = editingOverlay.polygonPoints,
+                            materialBitmap = selectedMaterialBmp,
+                            holes = listOf(holePoints)
+                        )
+                    }
+
+                    val newOverlay = OverlayMaterialModel(
+                        overlay = appliedMaterialBitmap.await(),
+                        polygonPoints = editingOverlay.polygonPoints,
+                        holePoints = holePoints,
+                        material = editingOverlay.material,
+                        position = editingOverlay.position,
+                    )
+
+                    mainUiState.update { state ->
+                        state.copy(
+                            overlays = state.overlays.toPersistentList().set(index, newOverlay),
+                            polygonPoints = emptyList()
+                        )
                     }
                 }
             }

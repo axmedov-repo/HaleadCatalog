@@ -84,11 +84,11 @@ fun MainScreen(
                     canRedo = mainUiState.canRedo,
                     baseImage = mainUiState.imageBmp,
                     isOverlaysEmpty = mainUiState.overlays.isEmpty(),
-                    isPolygonPointsEmpty = mainUiState.polygonPoints.isEmpty(),
+                    polygonPoints = mainUiState.polygonPoints,
                     isOverlaySelected = mainUiState.currentOverlay != null,
                     selectedCursor = currentCursorState,
                     onFunctionClicked = { function ->
-                        if (function.type == FunctionsEnum.REPLACE_IMAGE) {
+                        if (function.type == FunctionsEnum.RESET_IMAGE) {
                             showImagePickerDialog = true
                         } else {
                             viewModel.selectFunction(function)
