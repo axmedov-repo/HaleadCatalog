@@ -89,6 +89,6 @@ dependencies {
     // Lotti animations
     implementation(libs.lottie.compose)
 
-    // SMILE - Statistical Machine Intelligence and Learning Engine
-    implementation(libs.smile.kotlin)
+    // Data Store Preferences
+    implementation(libs.androidx.datastore.preferences)
 }

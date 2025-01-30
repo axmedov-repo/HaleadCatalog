@@ -2,7 +2,11 @@ package com.halead.catalog.utils
 
 import androidx.compose.ui.geometry.Offset
 
-fun isPointInPolygon(point: Offset, polygon: List<Offset>): Boolean {
+fun isPointInPolygon(point: Offset, polygon: List<Offset>, excluding: List<Offset> = emptyList()): Boolean {
+    if (excluding.isNotEmpty() && isPointInPolygon(point, excluding)) {
+        return false
+    }
+
     var isInside = false
     val n = polygon.size
     var j = n - 1 // Previous vertex index (wraps around to last point)

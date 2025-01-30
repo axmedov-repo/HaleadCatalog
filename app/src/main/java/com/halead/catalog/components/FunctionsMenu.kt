@@ -25,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
@@ -37,6 +36,7 @@ import com.halead.catalog.data.enums.FunctionData
 import com.halead.catalog.data.enums.FunctionsEnum
 import com.halead.catalog.data.enums.cursorTypesList
 import com.halead.catalog.data.enums.functionsList
+import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.ui.theme.SelectedItemColor
 
 @Composable
@@ -45,9 +45,9 @@ fun FunctionsMenu(
     canUndo: Boolean,
     canRedo: Boolean,
     baseImage: ImageBitmap?,
-    isOverlaysEmpty: Boolean,
-    polygonPoints: List<Offset>,
-    isOverlaySelected: Boolean,
+    overlays: List<OverlayMaterialModel>,
+    polygonPointsSize: Int,
+    selectedOverlay: OverlayMaterialModel?,
     selectedCursor: CursorData?,
     onFunctionClicked: (FunctionData) -> Unit,
     onCursorClicked: (CursorData) -> Unit,
@@ -70,9 +70,9 @@ fun FunctionsMenu(
                     data = functionData,
                     canUndo = canUndo,
                     canRedo = canRedo,
-                    isOverlaysEmpty = isOverlaysEmpty,
-                    polygonPoints = polygonPoints,
-                    isOverlaySelected = isOverlaySelected,
+                    overlays = overlays,
+                    polygonPointsSize = polygonPointsSize,
+                    selectedOverlay = selectedOverlay,
                     baseImage = baseImage,
                     onFunctionClicked = { onFunctionClicked(functionData) }
                 )
@@ -101,23 +101,25 @@ fun FunctionItem(
     data: FunctionData,
     canUndo: Boolean,
     canRedo: Boolean,
-    isOverlaysEmpty: Boolean,
-    polygonPoints: List<Offset>,
-    isOverlaySelected: Boolean,
+    overlays: List<OverlayMaterialModel>,
+    polygonPointsSize: Int,
+    selectedOverlay: OverlayMaterialModel?,
     baseImage: ImageBitmap?,
     onFunctionClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val disabled by remember(
-        data.type, canUndo, canRedo, isOverlaysEmpty, polygonPoints.size, isOverlaySelected, baseImage
+        data.type, canUndo, canRedo, overlays, polygonPointsSize, selectedOverlay, baseImage
     ) {
         derivedStateOf {
             when (data.type) {
                 FunctionsEnum.REDO -> !canRedo
                 FunctionsEnum.UNDO -> !canUndo
-                FunctionsEnum.ADD_LAYER -> isOverlaysEmpty
-                FunctionsEnum.CLEAR_LAYERS -> polygonPoints.isEmpty()
-                FunctionsEnum.REMOVE_SELECTION -> isOverlaysEmpty || polygonPoints.size < 3 || isOverlaySelected
+                FunctionsEnum.ADD_LAYER -> overlays.isEmpty()
+                FunctionsEnum.CLEAR_LAYERS -> polygonPointsSize == 0
+                FunctionsEnum.REMOVE_SELECTION -> overlays.isEmpty() || polygonPointsSize < 3 || (selectedOverlay != null && selectedOverlay.material != 1)
+                FunctionsEnum.MOVE_TO_FRONT -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(selectedOverlay) == overlays.lastIndex
+                FunctionsEnum.MOVE_TO_BACK -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(selectedOverlay) == 0
                 else -> baseImage == null
             }
         }

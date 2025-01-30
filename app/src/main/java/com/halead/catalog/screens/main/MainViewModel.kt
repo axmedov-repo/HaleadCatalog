@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface MainViewModel {
     val mainUiState: StateFlow<MainUiState>
+    val switchValue: StateFlow<Boolean>
+    fun changeSwitchValue(value: Boolean)
     val loadingApplyMaterialState: StateFlow<Boolean>
     val currentCursorState: StateFlow<CursorData>
     fun selectMaterial(material: Int)
@@ -25,7 +27,7 @@ interface MainViewModel {
     fun updatePolygonPoint(index: Int, offset: Offset)
     fun extendPolygonPoints(offset: Offset)
     fun memorizeUpdatedPolygonPoints()
-    fun updateCurrentOverlayPosition(overlayIndex :Int, dragAmount: Offset)
+    fun updateCurrentOverlayPosition(overlayIndex: Int, dragAmount: Offset)
     fun clearPolygonPoints()
     fun bringHistoryWork(workModel: WorkModel)
 }

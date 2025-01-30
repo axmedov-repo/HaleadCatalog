@@ -21,7 +21,7 @@ fun getPolygonHull(polygons: List<Offset>, n: Int = 4): List<Offset> {
 private fun findConvexHull(points: List<Offset>): List<Offset> {
     if (points.size < 3) return points
 
-    val start = points.minWith(compareBy({ it.y }, { it.x }))
+    val start = points.first()
     val sortedPoints = points.filter { it != start }.sortedWith(compareBy(
         { point ->
             val dx = point.x - start.x

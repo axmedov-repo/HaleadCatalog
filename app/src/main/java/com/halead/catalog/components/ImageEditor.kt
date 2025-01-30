@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.halead.catalog.data.enums.CursorData
@@ -36,11 +35,13 @@ import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.screens.main.MainViewModel
 import com.halead.catalog.screens.main.MainViewModelImpl
 import com.halead.catalog.ui.theme.SelectedItemColor
+import com.halead.catalog.utils.getPolygonHull
 import com.halead.catalog.utils.isPointInPolygon
-import com.halead.catalog.utils.timber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ImageEditor(
@@ -51,7 +52,7 @@ fun ImageEditor(
     viewModel: MainViewModel = viewModel<MainViewModelImpl>()
 ) {
     val mainUiState by viewModel.mainUiState.collectAsState()
-    val context = LocalContext.current
+    var selectionJob: Job? = null
     val aspectRatio by remember(imageBitmap) {
         derivedStateOf { imageBitmap.width.toFloat() / imageBitmap.height.toFloat() }
     }
@@ -124,35 +125,44 @@ fun ImageEditor(
                         CursorTypes.DRAG_PAN -> {
                             detectDragGestures(
                                 onDragStart = { offset ->
-                                    // Check if the touch is near any of the circles
-                                    CoroutineScope(Dispatchers.Default).launch {
-                                        val latestOverlays = viewModel.mainUiState.value.overlays
-                                        for (index in latestOverlays.size - 1 downTo 0) {
-                                            val overlay = latestOverlays[index]
-                                            if (isPointInPolygon(offset, overlay.polygonPoints)) {
-                                                viewModel.selectOverlay(overlay)
-                                                currentOverlay = Pair(index, overlay)
-                                                return@launch
+                                    selectionJob?.cancel()
+                                    selectionJob = CoroutineScope(Dispatchers.Default).launch {
+                                        val selectedOverlay = viewModel.mainUiState.value.overlays
+                                            .asReversed()
+                                            .firstOrNull { isPointInPolygon(offset, it.polygonPoints, it.holePoints) }
+
+                                        withContext(Dispatchers.Main) {
+                                            selectedPointIndex = mainUiState.polygonPoints.indexOfFirst { point ->
+                                                (offset - point).getDistance() <= 32f
+                                            }
+
+                                            if (selectedPointIndex == -1) {
+                                                selectedOverlay?.let {
+                                                    viewModel.selectOverlay(it)
+                                                    currentOverlay = Pair(viewModel.mainUiState.value.overlays.indexOf(it), it)
+                                                }
                                             }
                                         }
-                                    }
-                                    selectedPointIndex = mainUiState.polygonPoints.indexOfFirst { point ->
-                                        (offset - point).getDistance() <= 30f // 8f is the circle radius
+
+                                        selectionJob = null
                                     }
                                 },
                                 onDrag = { change, dragAmount ->
-                                    // Update the position of the selected circle
-                                    if (selectedPointIndex != -1) {
-                                        viewModel.updatePolygonPoint(
-                                            selectedPointIndex,
-                                            mainUiState.polygonPoints[selectedPointIndex] + Offset(dragAmount.x, dragAmount.y)
-                                        )
-                                        change.consume() // Consume the drag event
-                                    } else if (currentOverlay != null) {
-                                        viewModel.updateCurrentOverlayPosition(
-                                            overlayIndex = currentOverlay!!.first,
-                                            dragAmount = Offset(dragAmount.x, dragAmount.y)
-                                        )
+                                    CoroutineScope(Dispatchers.Main).launch {
+                                        selectionJob?.join()
+                                        // Update the position of the selected circle
+                                        if (selectedPointIndex != -1) {
+                                            viewModel.updatePolygonPoint(
+                                                selectedPointIndex,
+                                                mainUiState.polygonPoints[selectedPointIndex] + Offset(dragAmount.x, dragAmount.y)
+                                            )
+                                            change.consume() // Consume the drag event
+                                        } else if (currentOverlay != null) {
+                                            viewModel.updateCurrentOverlayPosition(
+                                                overlayIndex = currentOverlay!!.first,
+                                                dragAmount = Offset(dragAmount.x, dragAmount.y)
+                                            )
+                                        }
                                     }
                                 },
                                 onDragEnd = {
@@ -161,6 +171,7 @@ fun ImageEditor(
                                         currentOverlay = null
                                         viewModel.memorizeUpdatedPolygonPoints()
                                     }
+                                    selectionJob = null
                                 }
                             )
                         }
@@ -171,8 +182,7 @@ fun ImageEditor(
                         detectTapGestures(onTap = { point ->
                             for (index in overlays.size - 1 downTo 0) {
                                 val overlay = overlays[index]
-                                timber("PIP_CHECK", "${isPointInPolygon(point, overlay.polygonPoints)}")
-                                if (isPointInPolygon(point, overlay.polygonPoints)) {
+                                if (isPointInPolygon(point, overlay.polygonPoints, overlay.holePoints)) {
                                     viewModel.selectOverlay(overlay)
                                     return@detectTapGestures
                                 }
@@ -206,6 +216,33 @@ fun ImageEditor(
 
             if (mainUiState.polygonPoints.isNotEmpty()) {
                 mainUiState.polygonPoints.forEach { point ->
+                    drawCircle(color = SelectedItemColor, center = point, radius = 8f)
+                }
+            }
+
+            val rectCorners = getPolygonHull(mainUiState.polygonPoints)
+            if (rectCorners.size > 1) {
+                drawLine(
+                    color = Color.Red,
+                    start = rectCorners.last(),
+                    end = rectCorners.first(),
+                    strokeWidth = 3f
+                )
+            }
+
+            if (rectCorners.size > 2) {
+                rectCorners.zipWithNext().forEach { (start, end) ->
+                    drawLine(
+                        color = Color.Red,
+                        start = start,
+                        end = end,
+                        strokeWidth = 3f
+                    )
+                }
+            }
+
+            if (rectCorners.isNotEmpty()) {
+                rectCorners.forEach { point ->
                     drawCircle(color = SelectedItemColor, center = point, radius = 8f)
                 }
             }

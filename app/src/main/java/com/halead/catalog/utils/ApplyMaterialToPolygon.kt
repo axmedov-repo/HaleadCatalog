@@ -20,14 +20,10 @@ fun applyMaterialToPolygon(
     // Validate polygon points
     if (polygonPoints.size < 3) return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
 
-    // Find minimum bounding rotated rectangle
-    val points = polygonPoints.map { Point(it.x.toDouble(), it.y.toDouble()) }
-    val matOfPoints = MatOfPoint2f(*points.toTypedArray())
-    val rotatedRect = Imgproc.minAreaRect(matOfPoints)
-
     // Get rectangle corners
-    val rectCorners = getPolygonHull(polygonPoints)//Array(4) { Point() }
-//        rotatedRect.points(rectCorners)
+    val rectCorners = getPolygonHull(polygonPoints)
+    timber("rectCorners", "polygon=$polygonPoints")
+    timber("rectCorners", "rectCorners=$rectCorners")
 
     // Calculate polygon bounds
     val minX = polygonPoints.minOf { it.x }

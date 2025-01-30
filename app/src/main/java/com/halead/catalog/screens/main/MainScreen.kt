@@ -1,6 +1,7 @@
 package com.halead.catalog.screens.main
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,10 +20,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.halead.catalog.components.FunctionsMenu
 import com.halead.catalog.components.ImageSelector
 import com.halead.catalog.components.MaterialsMenu
+import com.halead.catalog.components.PerspectiveSwitch
 import com.halead.catalog.components.PrimaryButton
 import com.halead.catalog.components.TopBarFunctionType
 import com.halead.catalog.data.enums.FunctionsEnum
@@ -39,6 +42,7 @@ fun MainScreen(
     val mainUiState by viewModel.mainUiState.collectAsState()
     val loadingApplyMaterialState by viewModel.loadingApplyMaterialState.collectAsState()
     val currentCursorState by viewModel.currentCursorState.collectAsState()
+    val perspectiveSwitchValue by viewModel.switchValue.collectAsState()
     var showImagePickerDialog by rememberSaveable { mutableStateOf(false) }
 
     val isPrimaryButtonEnabled by remember(mainUiState.selectedMaterial, mainUiState.imageBmp) {
@@ -76,28 +80,40 @@ fun MainScreen(
                     .fillMaxHeight()
                     .weight(10f)
             ) {
-                FunctionsMenu(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .wrapContentHeight(),
-                    canUndo = mainUiState.canUndo,
-                    canRedo = mainUiState.canRedo,
-                    baseImage = mainUiState.imageBmp,
-                    isOverlaysEmpty = mainUiState.overlays.isEmpty(),
-                    polygonPoints = mainUiState.polygonPoints,
-                    isOverlaySelected = mainUiState.currentOverlay != null,
-                    selectedCursor = currentCursorState,
-                    onFunctionClicked = { function ->
-                        if (function.type == FunctionsEnum.RESET_IMAGE) {
-                            showImagePickerDialog = true
-                        } else {
-                            viewModel.selectFunction(function)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    FunctionsMenu(
+                        modifier = Modifier
+                            .weight(1f)
+                            .wrapContentHeight(),
+                        canUndo = mainUiState.canUndo,
+                        canRedo = mainUiState.canRedo,
+                        baseImage = mainUiState.imageBmp,
+                        overlays = mainUiState.overlays,
+                        polygonPointsSize = mainUiState.polygonPoints.size,
+                        selectedOverlay = mainUiState.currentOverlay,
+                        selectedCursor = currentCursorState,
+                        onFunctionClicked = { function ->
+                            if (function.type == FunctionsEnum.RESET_IMAGE) {
+                                showImagePickerDialog = true
+                            } else {
+                                viewModel.selectFunction(function)
+                            }
+                        },
+                        onCursorClicked = { cursor ->
+                            viewModel.selectCursor(cursor)
                         }
-                    },
-                    onCursorClicked = { cursor ->
-                        viewModel.selectCursor(cursor)
-                    }
-                )
+                    )
+                    PerspectiveSwitch(
+                        isChecked = perspectiveSwitchValue,
+                        onCheckedChange = viewModel::changeSwitchValue
+                    )
+                }
                 ImageSelector(
                     modifier = Modifier.weight(1f),
                     imageBmp = mainUiState.imageBmp,

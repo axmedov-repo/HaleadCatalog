@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.halead.catalog.data.RecentAction
 import com.halead.catalog.data.RecentActions
+import com.halead.catalog.data.Settings
 import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.DefaultCursorData
 import com.halead.catalog.data.enums.FunctionData
@@ -19,7 +20,9 @@ import com.halead.catalog.data.states.toTrackedState
 import com.halead.catalog.repository.main.MainRepository
 import com.halead.catalog.utils.applyMaterialToPolygon
 import com.halead.catalog.utils.applyMaterialToPolygonWithHoles
+import com.halead.catalog.utils.applyMaterialToQuadrilateral
 import com.halead.catalog.utils.findMinOffset
+import com.halead.catalog.utils.getClippedMaterial
 import com.halead.catalog.utils.getTemporaryClippedOverlay
 import com.halead.catalog.utils.isPointInPolygon
 import com.halead.catalog.utils.timber
@@ -31,6 +34,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.firstOrNull
@@ -38,6 +43,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -45,7 +51,8 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModelImpl @Inject constructor(
     private val mainRepository: MainRepository,
-    private val recentActions: RecentActions
+    private val recentActions: RecentActions,
+    private val settings: Settings
 ) : MainViewModel, ViewModel() {
     override val mainUiState = MutableStateFlow(MainUiState())
     override val loadingApplyMaterialState = MutableStateFlow(false)
@@ -54,6 +61,15 @@ class MainViewModelImpl @Inject constructor(
     private var isRecentActionSavingEnabled = true
     private var isUndoEnabled: Boolean = true
     private var isRedoEnabled: Boolean = true
+
+    override val switchValue: StateFlow<Boolean> = settings.perspectiveSwitchValue
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    override fun changeSwitchValue(value: Boolean) {
+        viewModelScope.launch {
+            settings.changePerspectiveSwitch(value)
+        }
+    }
 
     init {
         timber("Materials", "init")
@@ -146,6 +162,7 @@ class MainViewModelImpl @Inject constructor(
                     polygonPoints = emptyList()
                 )
             }
+            currentCursorState.update { DefaultCursorData }
         }
     }
 
@@ -219,14 +236,56 @@ class MainViewModelImpl @Inject constructor(
                 }
 
                 FunctionsEnum.MOVE_TO_BACK -> {
-
+                    moveSelectedOverlayToBack()
                 }
 
                 FunctionsEnum.MOVE_TO_FRONT -> {
-
+                    moveSelectedOverlayToFront()
                 }
 
                 else -> {}
+            }
+        }
+    }
+
+    private fun moveSelectedOverlayToBack() {
+        viewModelScope.launch {
+            mainUiState.value.overlays.takeIf { it.size >= 2 }?.let { overlays ->
+                val selectedIdx = overlays.indexOf(mainUiState.value.currentOverlay)
+                val swapIdx = selectedIdx - 1
+
+                if (selectedIdx in 1 until overlays.size && swapIdx in overlays.indices) {
+                    val selectedOverlay = overlays[selectedIdx]
+                    val swapOverlay = overlays[swapIdx]
+                    mainUiState.update {
+                        it.copy(
+                            overlays = overlays.toPersistentList()
+                                .set(selectedIdx, swapOverlay)
+                                .set(swapIdx, selectedOverlay)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun moveSelectedOverlayToFront() {
+        viewModelScope.launch {
+            mainUiState.value.overlays.takeIf { it.size >= 2 }?.let { overlays ->
+                val selectedIdx = overlays.indexOf(mainUiState.value.currentOverlay)
+                val swapIdx = selectedIdx + 1
+
+                if (selectedIdx in 0 until overlays.size - 1 && swapIdx in overlays.indices) {
+                    val selectedOverlay = overlays[selectedIdx]
+                    val swapOverlay = overlays[swapIdx]
+                    mainUiState.update {
+                        it.copy(
+                            overlays = overlays.toPersistentList()
+                                .set(selectedIdx, swapOverlay)
+                                .set(swapIdx, selectedOverlay)
+                        )
+                    }
+                }
             }
         }
     }
@@ -319,17 +378,30 @@ class MainViewModelImpl @Inject constructor(
                 }
 
                 timber("Materials", "selectedMaterialBmp=$selectedMaterialBmp")
-
                 if (selectedMaterialBmp != null) {
                     val offsetOfOverlay = async(Dispatchers.Default) {
                         findMinOffset(uiState.polygonPoints)
                     }
 
                     val appliedMaterialBitmap = async(Dispatchers.Default) {
-                        applyMaterialToPolygon(
-                            polygonPoints = uiState.polygonPoints,
-                            materialBitmap = selectedMaterialBmp
-                        )
+                        if (switchValue.value) {
+                            if (uiState.polygonPoints.size == 4) {
+                                applyMaterialToQuadrilateral(
+                                    polygonPoints = uiState.polygonPoints,
+                                    materialBitmap = selectedMaterialBmp
+                                )
+                            } else {
+                                applyMaterialToPolygon(
+                                    polygonPoints = uiState.polygonPoints,
+                                    materialBitmap = selectedMaterialBmp
+                                )
+                            }
+                        } else {
+                            getClippedMaterial(
+                                outerPolygon = uiState.polygonPoints,
+                                materialBitmap = selectedMaterialBmp
+                            )
+                        }
                     }
 
                     val newOverlay = OverlayMaterialModel(
@@ -381,11 +453,19 @@ class MainViewModelImpl @Inject constructor(
 
                 if (selectedMaterialBmp != null) {
                     val appliedMaterialBitmap = async(Dispatchers.Default) {
-                        applyMaterialToPolygonWithHoles(
-                            outerPolygon = editingOverlay.polygonPoints,
-                            materialBitmap = selectedMaterialBmp,
-                            holes = listOf(holePoints)
-                        )
+                        if (switchValue.value) {
+                            applyMaterialToPolygonWithHoles(
+                                outerPolygon = editingOverlay.polygonPoints,
+                                materialBitmap = selectedMaterialBmp,
+                                holes = listOf(holePoints)
+                            )
+                        } else {
+                            getClippedMaterial(
+                                outerPolygon = editingOverlay.polygonPoints,
+                                materialBitmap = selectedMaterialBmp,
+                                holes = listOf(holePoints)
+                            )
+                        }
                     }
 
                     val newOverlay = OverlayMaterialModel(

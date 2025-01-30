@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.halead.catalog.data.enums.CursorData
@@ -107,15 +108,25 @@ fun ImageSelector(
             }
         }
 
-        ImagePickerDialog(showDialog = showImagePicker, onDismiss = {
-            changeImagePickerVisibility(false)
-        }, onCameraClick = {
-            changeImagePickerVisibility(false)
-            cameraLauncher.launch() // Open Camera
-        }, onGalleryClick = {
-            changeImagePickerVisibility(false)
-            galleryLauncher.launch("image/*") // Open Gallery
-        })
+        ImagePickerDialog(
+            showDialog = showImagePicker,
+            hasCurrentImage = imageBmp != null,
+            onResetCurrentImage = {
+                launchersResult = imageBmp?.asAndroidBitmap()?.let { Bitmap.createBitmap(it) }
+                changeImagePickerVisibility(false)
+            },
+            onDismiss = {
+                changeImagePickerVisibility(false)
+            },
+            onCameraClick = {
+                cameraLauncher.launch() // Open Camera
+                changeImagePickerVisibility(false)
+            },
+            onGalleryClick = {
+                galleryLauncher.launch("image/*") // Open Gallery
+                changeImagePickerVisibility(false)
+            }
+        )
 
         ConfirmationDialog(showDialog = showConfirmationDialog,
             title = "Upload New Image?",
