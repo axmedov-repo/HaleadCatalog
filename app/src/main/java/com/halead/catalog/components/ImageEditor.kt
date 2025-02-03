@@ -2,8 +2,10 @@ package com.halead.catalog.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -23,42 +24,47 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.CursorTypes
 import com.halead.catalog.data.models.OverlayMaterialModel
-import com.halead.catalog.screens.main.MainViewModel
-import com.halead.catalog.screens.main.MainViewModelImpl
+import com.halead.catalog.ui.events.MainUiEvent
 import com.halead.catalog.ui.theme.SelectedItemColor
-import com.halead.catalog.utils.getPolygonHull
+import com.halead.catalog.utils.findPolygonCenter
+import com.halead.catalog.utils.getBitmapFromResource
+import com.halead.catalog.utils.isPanoramic
 import com.halead.catalog.utils.isPointInPolygon
+import com.halead.catalog.utils.timber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 fun ImageEditor(
     imageBitmap: ImageBitmap,
     overlays: List<OverlayMaterialModel>,
     currentCursor: CursorData,
+    polygonPoints: List<Offset>,
     modifier: Modifier = Modifier,
-    viewModel: MainViewModel = viewModel<MainViewModelImpl>()
+    onMainUiEvent: (MainUiEvent) -> Unit
 ) {
-    val mainUiState by viewModel.mainUiState.collectAsState()
-    var selectionJob: Job? = null
     val aspectRatio by remember(imageBitmap) {
         derivedStateOf { imageBitmap.width.toFloat() / imageBitmap.height.toFloat() }
     }
 
+    val pivot by remember(polygonPoints) {
+        derivedStateOf {
+            findPolygonCenter(polygonPoints)
+        }
+    }
+
     var selectedPointIndex by remember { mutableIntStateOf(-1) }
-    var currentOverlay = remember<Pair<Int, OverlayMaterialModel>?> { null }
 
     Box(
         modifier = modifier
@@ -81,24 +87,73 @@ fun ImageEditor(
         // Overlays
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
             if (overlays.isNotEmpty()) {
-                overlays.forEach { overlay ->
-                    Image(
-                        bitmap = overlay.overlay.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .graphicsLayer(
-                                translationX = overlay.position.x,
-                                translationY = overlay.position.y
-                            ),
-                        contentScale = ContentScale.None
-                    )
+                overlays.forEach { overlayData ->
+                    val materialBmp = getBitmapFromResource(LocalContext.current, overlayData.material)
+                    val state = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
+                        onMainUiEvent(MainUiEvent.UpdateCurrentOverlayTransform(zoomChange, offsetChange, rotationChange))
+                    }
+                    timber("OVERLAY_DATA", "offset=${overlayData.offset}")
+                    if (materialBmp?.isPanoramic() == true) { // TODO: Handle panoramic materials
+                        PerspectiveScrollableImage(
+                            bitmap = materialBmp,
+                            outerPolygon = overlayData.polygonPoints,
+                            holes = overlayData.holePoints
+                        )
+                    } else {
+                        Image(
+                            bitmap = overlayData.overlay.asImageBitmap(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .graphicsLayer {
+                                    // Apply transformations relative to the center of the overlay
+                                    val pivotX = overlayData.polygonCenter.x - overlayData.offset.x
+                                    val pivotY = overlayData.polygonCenter.y - overlayData.offset.y
+
+                                    translationX = overlayData.offset.x
+                                    translationY = overlayData.offset.y
+
+                                    rotationZ = overlayData.rotation
+                                    scaleX = overlayData.scale
+                                    scaleY = overlayData.scale
+
+                                    transformOrigin = TransformOrigin(
+                                         pivotX / overlayData.overlay.width,
+                                         pivotY / overlayData.overlay.height
+                                    )
+                                }
+                                .pointerInput(currentCursor) {
+                                    if (currentCursor.type == CursorTypes.DRAG_PAN) {
+                                        detectDragGestures(
+                                            onDragStart = {
+                                                onMainUiEvent(MainUiEvent.SelectOverlay(overlayData))
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                CoroutineScope(Dispatchers.Main).launch {
+                                                    onMainUiEvent(
+                                                        MainUiEvent.UpdateCurrentOverlayPosition(
+                                                            overlayIndex = null,
+                                                            dragAmount = Offset(dragAmount.x, dragAmount.y)
+                                                        )
+                                                    )
+                                                    change.consume()
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                onMainUiEvent(MainUiEvent.MemorizeUpdatedPolygonPoints)
+                                            }
+                                        )
+                                    }
+                                },
+                            contentScale = ContentScale.None
+                        )
+                    }
                 }
                 LaunchedEffect(overlays) {
-                    viewModel.allOverlaysDrawn()
+                    onMainUiEvent(MainUiEvent.AllOverlaysDrawn)
                 }
             } else {
                 LaunchedEffect(overlays) {
-                    viewModel.allOverlaysDrawn()
+                    onMainUiEvent(MainUiEvent.AllOverlaysDrawn)
                 }
             }
         }
@@ -107,104 +162,81 @@ fun ImageEditor(
         Canvas(
             modifier = Modifier
                 .matchParentSize()
-                .clip(RoundedCornerShape(8.dp))
                 .pointerInput(currentCursor) {
                     when (currentCursor.type) {
                         CursorTypes.DRAW_INSERT -> {
                             detectTapGestures(onPress = { offset ->
-                                viewModel.insertPolygonPoint(offset)
+                                onMainUiEvent(MainUiEvent.InsertPolygonPoint(offset))
                             })
                         }
 
                         CursorTypes.DRAW_EXTEND -> {
                             detectTapGestures(onPress = { offset ->
-                                viewModel.extendPolygonPoints(offset)
+                                onMainUiEvent(MainUiEvent.ExtendPolygonPoints(offset))
                             })
                         }
 
                         CursorTypes.DRAG_PAN -> {
                             detectDragGestures(
                                 onDragStart = { offset ->
-                                    selectionJob?.cancel()
-                                    selectionJob = CoroutineScope(Dispatchers.Default).launch {
-                                        val selectedOverlay = viewModel.mainUiState.value.overlays
-                                            .asReversed()
-                                            .firstOrNull { isPointInPolygon(offset, it.polygonPoints, it.holePoints) }
-
-                                        withContext(Dispatchers.Main) {
-                                            selectedPointIndex = mainUiState.polygonPoints.indexOfFirst { point ->
-                                                (offset - point).getDistance() <= 32f
-                                            }
-
-                                            if (selectedPointIndex == -1) {
-                                                selectedOverlay?.let {
-                                                    viewModel.selectOverlay(it)
-                                                    currentOverlay = Pair(viewModel.mainUiState.value.overlays.indexOf(it), it)
-                                                }
-                                            }
+                                    CoroutineScope(Dispatchers.Default).launch {
+                                        selectedPointIndex = polygonPoints.indexOfFirst { point ->
+                                            (offset - point).getDistance() <= 32f
                                         }
-
-                                        selectionJob = null
                                     }
                                 },
                                 onDrag = { change, dragAmount ->
                                     CoroutineScope(Dispatchers.Main).launch {
-                                        selectionJob?.join()
-                                        // Update the position of the selected circle
                                         if (selectedPointIndex != -1) {
-                                            viewModel.updatePolygonPoint(
-                                                selectedPointIndex,
-                                                mainUiState.polygonPoints[selectedPointIndex] + Offset(dragAmount.x, dragAmount.y)
+                                            onMainUiEvent(
+                                                MainUiEvent.UpdatePolygonPoint(
+                                                    selectedPointIndex,
+                                                    polygonPoints[selectedPointIndex] + Offset(dragAmount.x, dragAmount.y)
+                                                )
                                             )
                                             change.consume() // Consume the drag event
-                                        } else if (currentOverlay != null) {
-                                            viewModel.updateCurrentOverlayPosition(
-                                                overlayIndex = currentOverlay!!.first,
-                                                dragAmount = Offset(dragAmount.x, dragAmount.y)
-                                            )
                                         }
                                     }
                                 },
                                 onDragEnd = {
-                                    if (selectedPointIndex != -1 || currentOverlay != null) {
+                                    if (selectedPointIndex != -1) {
                                         selectedPointIndex = -1 // Reset selection
-                                        currentOverlay = null
-                                        viewModel.memorizeUpdatedPolygonPoints()
+                                        onMainUiEvent(MainUiEvent.MemorizeUpdatedPolygonPoints)
                                     }
-                                    selectionJob = null
                                 }
                             )
                         }
                     }
                 }
+                // TODO: Not necessary after sensor gestures
                 .pointerInput(currentCursor, overlays) {
                     if (currentCursor.type == CursorTypes.DRAG_PAN) {
                         detectTapGestures(onTap = { point ->
                             for (index in overlays.size - 1 downTo 0) {
                                 val overlay = overlays[index]
                                 if (isPointInPolygon(point, overlay.polygonPoints, overlay.holePoints)) {
-                                    viewModel.selectOverlay(overlay)
+                                    onMainUiEvent(MainUiEvent.SelectOverlay(overlay))
                                     return@detectTapGestures
                                 }
                             }
-                            if (mainUiState.polygonPoints.isNotEmpty()) {
-                                viewModel.unselectCurrentOverlay()
+                            if (polygonPoints.isNotEmpty()) {
+                                onMainUiEvent(MainUiEvent.UnselectCurrentOverlay)
                             }
                         })
                     }
                 }
         ) {
-            if (mainUiState.polygonPoints.size > 1) {
+            if (polygonPoints.size > 1) {
                 drawLine(
                     color = Color.Green,
-                    start = mainUiState.polygonPoints.last(),
-                    end = mainUiState.polygonPoints.first(),
+                    start = polygonPoints.last(),
+                    end = polygonPoints.first(),
                     strokeWidth = 3f
                 )
             }
 
-            if (mainUiState.polygonPoints.size > 2) {
-                mainUiState.polygonPoints.zipWithNext().forEach { (start, end) ->
+            if (polygonPoints.size > 2) {
+                polygonPoints.zipWithNext().forEach { (start, end) ->
                     drawLine(
                         color = Color.Green,
                         start = start,
@@ -214,38 +246,12 @@ fun ImageEditor(
                 }
             }
 
-            if (mainUiState.polygonPoints.isNotEmpty()) {
-                mainUiState.polygonPoints.forEach { point ->
+            if (polygonPoints.isNotEmpty()) {
+                polygonPoints.forEach { point ->
                     drawCircle(color = SelectedItemColor, center = point, radius = 8f)
                 }
             }
-
-            val rectCorners = getPolygonHull(mainUiState.polygonPoints)
-            if (rectCorners.size > 1) {
-                drawLine(
-                    color = Color.Red,
-                    start = rectCorners.last(),
-                    end = rectCorners.first(),
-                    strokeWidth = 3f
-                )
-            }
-
-            if (rectCorners.size > 2) {
-                rectCorners.zipWithNext().forEach { (start, end) ->
-                    drawLine(
-                        color = Color.Red,
-                        start = start,
-                        end = end,
-                        strokeWidth = 3f
-                    )
-                }
-            }
-
-            if (rectCorners.isNotEmpty()) {
-                rectCorners.forEach { point ->
-                    drawCircle(color = SelectedItemColor, center = point, radius = 8f)
-                }
-            }
+            drawCircle(color = Color.Red, center = findPolygonCenter(polygonPoints), radius = 8f)
         }
     }
 }

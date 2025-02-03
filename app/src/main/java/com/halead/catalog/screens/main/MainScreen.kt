@@ -27,51 +27,69 @@ import com.halead.catalog.components.ImageSelector
 import com.halead.catalog.components.MaterialsMenu
 import com.halead.catalog.components.PerspectiveSwitch
 import com.halead.catalog.components.PrimaryButton
-import com.halead.catalog.components.TopBarFunctionType
+import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.FunctionsEnum
-import com.halead.catalog.screens.work.WorkHistoryPanel
+import com.halead.catalog.data.enums.ImageSelectingPurpose
+import com.halead.catalog.data.states.MainUiState
+import com.halead.catalog.ui.events.MainUiEvent
 import com.halead.catalog.ui.theme.ButtonColor
 import com.halead.catalog.ui.theme.SelectedItemColor
+import com.halead.catalog.utils.canMakeClosedShape
 
-// TODO: Use Layout Inspector to optimize recompositions
 @Composable
-fun MainScreen(
-    selectedTopBarFunction: TopBarFunctionType? = null,
-    viewModel: MainViewModel = viewModel<MainViewModelImpl>()
-) {
-    val mainUiState by viewModel.mainUiState.collectAsState()
+fun MainScreen() {
+    val viewModel: MainViewModel = viewModel<MainViewModelImpl>()
+    val state by viewModel.mainUiState.collectAsState()
     val loadingApplyMaterialState by viewModel.loadingApplyMaterialState.collectAsState()
     val currentCursorState by viewModel.currentCursorState.collectAsState()
-    val perspectiveSwitchValue by viewModel.switchValue.collectAsState()
-    var showImagePickerDialog by rememberSaveable { mutableStateOf(false) }
+    val perspectiveSwitchValue by viewModel.isPerspectiveEnabled.collectAsState()
 
-    val isPrimaryButtonEnabled by remember(mainUiState.selectedMaterial, mainUiState.imageBmp) {
+    MainScreenContent(
+        uiState = state,
+        loadingApplyMaterial = loadingApplyMaterialState,
+        currentCursor = currentCursorState,
+        perspectiveSwitchValue = perspectiveSwitchValue,
+        onUiEvent = viewModel::onUiEvent
+    )
+}
+
+@Composable
+private fun MainScreenContent(
+    uiState: MainUiState,
+    loadingApplyMaterial: Boolean,
+    currentCursor: CursorData,
+    perspectiveSwitchValue: Boolean,
+    onUiEvent: (MainUiEvent) -> Unit
+) {
+    var imageSelectingPurpose by remember { mutableStateOf(ImageSelectingPurpose.EDITING_IMAGE) }
+    var showImagePickerDialog by rememberSaveable { mutableStateOf(false) }
+    val isPrimaryButtonEnabled by remember(uiState.selectedMaterial, uiState.imageBmp) {
         derivedStateOf {
-            mainUiState.selectedMaterial != null && mainUiState.imageBmp != null
+            uiState.selectedMaterial != null && uiState.imageBmp != null
         }
     }
     val primaryButtonText by remember(
-        mainUiState.materials,
-        mainUiState.selectedMaterial,
-        mainUiState.polygonPoints,
-        mainUiState.isMaterialApplied
+        uiState.materials,
+        uiState.selectedMaterial,
+        uiState.polygonPoints,
+        uiState.isMaterialApplied
     ) {
         derivedStateOf {
             when {
-                mainUiState.materials.isEmpty() -> "Loading Materials"
-                mainUiState.selectedMaterial == null -> "Select Material"
-                mainUiState.polygonPoints.size < 3 -> "Draw Region"
-                mainUiState.isMaterialApplied -> "Material Applied"
+                uiState.materials.isEmpty() -> "Loading Materials"
+                uiState.selectedMaterial == null -> "Select Material"
+                !uiState.polygonPoints.canMakeClosedShape() -> "Select Region"
+                uiState.isMaterialApplied -> "Material Applied"
                 else -> "Apply Material"
             }
         }
     }
-    val primaryButtonContainerColor by remember(mainUiState.isMaterialApplied, mainUiState.polygonPoints.size) {
+    val primaryButtonContainerColor by remember(uiState.isMaterialApplied, uiState.polygonPoints.size) {
         derivedStateOf {
-            if (mainUiState.isMaterialApplied && mainUiState.polygonPoints.size >= 3) SelectedItemColor else ButtonColor
+            if (uiState.isMaterialApplied && uiState.polygonPoints.canMakeClosedShape()) SelectedItemColor else ButtonColor
         }
     }
-    val onPrimaryButtonClick = remember { { viewModel.applyMaterial() } }
+    val onPrimaryButtonClick = remember { { onUiEvent(MainUiEvent.ApplyMaterial) } }
 
     Box(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize()) {
@@ -91,41 +109,46 @@ fun MainScreen(
                         modifier = Modifier
                             .weight(1f)
                             .wrapContentHeight(),
-                        canUndo = mainUiState.canUndo,
-                        canRedo = mainUiState.canRedo,
-                        baseImage = mainUiState.imageBmp,
-                        overlays = mainUiState.overlays,
-                        polygonPointsSize = mainUiState.polygonPoints.size,
-                        selectedOverlay = mainUiState.currentOverlay,
-                        selectedCursor = currentCursorState,
+                        canUndo = uiState.canUndo,
+                        canRedo = uiState.canRedo,
+                        baseImage = uiState.imageBmp,
+                        overlays = uiState.overlays,
+                        polygonPointsSize = uiState.polygonPoints.size,
+                        selectedOverlay = uiState.currentOverlay,
+                        selectedCursor = currentCursor,
                         onFunctionClicked = { function ->
                             if (function.type == FunctionsEnum.RESET_IMAGE) {
+                                imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
                                 showImagePickerDialog = true
                             } else {
-                                viewModel.selectFunction(function)
+                                onUiEvent(MainUiEvent.SelectFunction(function))
                             }
                         },
-                        onCursorClicked = { cursor ->
-                            viewModel.selectCursor(cursor)
-                        }
+                        onCursorClicked = { onUiEvent(MainUiEvent.SelectCursor(it)) }
                     )
+
                     PerspectiveSwitch(
                         isChecked = perspectiveSwitchValue,
-                        onCheckedChange = viewModel::changeSwitchValue
+                        onCheckedChange = { onUiEvent(MainUiEvent.ChangeSwitchValue(it)) }
                     )
                 }
+
                 ImageSelector(
                     modifier = Modifier.weight(1f),
-                    imageBmp = mainUiState.imageBmp,
+                    imageBmp = uiState.imageBmp,
+                    purpose = imageSelectingPurpose,
                     showImagePicker = showImagePickerDialog,
-                    polygonPoints = mainUiState.polygonPoints,
-                    overlays = mainUiState.overlays,
-                    currentCursor = currentCursorState,
-                    changeImagePickerVisibility = { showImagePickerDialog = it }
-                ) {
-                    viewModel.selectImage(it)
-                }
+                    polygonPoints = uiState.polygonPoints,
+                    overlays = uiState.overlays,
+                    currentCursor = currentCursor,
+                    changeImagePickerVisibility = {
+                        imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
+                        showImagePickerDialog = it
+                    },
+                    onMainUiEvent = onUiEvent
+                )
             }
+
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -135,36 +158,26 @@ fun MainScreen(
                 PrimaryButton(
                     primaryButtonText = primaryButtonText,
                     isPrimaryButtonEnabled = isPrimaryButtonEnabled,
-                    isMaterialsEmpty = mainUiState.materials.isEmpty(),
-                    isMaterialSelected = mainUiState.selectedMaterial != null,
+                    isMaterialsEmpty = uiState.materials.isEmpty(),
+                    isMaterialSelected = uiState.selectedMaterial != null,
                     containerColor = primaryButtonContainerColor,
                     onClick = onPrimaryButtonClick
                 )
+
                 MaterialsMenu(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxSize()
                         .background(Color.Red),
-                    materials = mainUiState.materials,
-                    selectedMaterial = mainUiState.selectedMaterial,
-                    loadingApplyMaterial = loadingApplyMaterialState,
-                    onMaterialSelected = { viewModel.selectMaterial(it) }
+                    materials = uiState.materials,
+                    selectedMaterial = uiState.selectedMaterial,
+                    loadingApplyMaterial = loadingApplyMaterial,
+                    onAddMaterial = {
+                        imageSelectingPurpose = ImageSelectingPurpose.ADD_MATERIAL
+                        showImagePickerDialog = true
+                    },
+                    onMaterialSelected = { onUiEvent(MainUiEvent.SelectMaterial(it)) }
                 )
-            }
-        }
-
-        Box(modifier = Modifier.align(Alignment.TopEnd)) {
-            when (selectedTopBarFunction) {
-                TopBarFunctionType.MENU -> {}
-                TopBarFunctionType.HISTORY -> {
-                    WorkHistoryPanel(
-                        onWorkClick = { viewModel.bringHistoryWork(it) }
-                    )
-                }
-
-                TopBarFunctionType.SHARE -> {}
-                TopBarFunctionType.SETTINGS -> {}
-                null -> {}
             }
         }
     }

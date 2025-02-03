@@ -6,16 +6,13 @@ import javax.inject.Singleton
 
 @Singleton
 class DataProvider @Inject constructor() {
-    val materials = mapOf(
-        "Material 1" to R.drawable.material1,
-        "Material 2" to R.drawable.material2,
-        "Material 3" to R.drawable.material3
-    )
-
     val materialsResIds = listOf<Int>(
         R.drawable.material,
         R.drawable.material1,
         R.drawable.material2,
-        R.drawable.material3
+        R.drawable.material3,
+        R.drawable.material6,
+        R.drawable.material4,
+        R.drawable.material5,
     )
 }

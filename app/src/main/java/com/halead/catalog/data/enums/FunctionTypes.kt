@@ -3,7 +3,7 @@ package com.halead.catalog.data.enums
 import com.halead.catalog.R
 
 enum class FunctionsEnum {
-    RESET_IMAGE, UNDO, REDO, ADD_LAYER, CLEAR_LAYERS, REMOVE_SELECTION, MOVE_TO_BACK, MOVE_TO_FRONT
+    RESET_IMAGE, UNDO, REDO, ADD_LAYER, CLEAR_LAYERS, REMOVE_SELECTION, MOVE_TO_BACK, MOVE_TO_FRONT, ROTATE_LEFT, ROTATE_RIGHT
 }
 
 data class FunctionData(
@@ -52,5 +52,15 @@ val functionsList = listOf(
         img = R.drawable.ic_move_to_front,
         text = "Move To Front",
         type = FunctionsEnum.MOVE_TO_FRONT
+    ),
+    FunctionData(
+        img = R.drawable.ic_rotate_left,
+        text = "Rotate Left",
+        type = FunctionsEnum.ROTATE_LEFT
+    ),
+    FunctionData(
+        img = R.drawable.ic_rotate_right,
+        text = "Rotate Right",
+        type = FunctionsEnum.ROTATE_RIGHT
     )
 )

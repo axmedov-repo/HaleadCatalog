@@ -34,31 +34,43 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.halead.catalog.data.enums.CursorData
+import com.halead.catalog.data.enums.ImageSelectingPurpose
 import com.halead.catalog.data.models.OverlayMaterialModel
+import com.halead.catalog.ui.events.MainUiEvent
 import com.halead.catalog.ui.theme.ButtonColor
+import com.halead.catalog.utils.canMakeClosedShape
 import com.halead.catalog.utils.getBitmapFromUri
 
 @Composable
 fun ImageSelector(
     imageBmp: ImageBitmap?,
+    purpose: ImageSelectingPurpose,
     overlays: List<OverlayMaterialModel>,
     polygonPoints: List<Offset>,
     modifier: Modifier = Modifier,
     showImagePicker: Boolean = false,
     currentCursor: CursorData,
     changeImagePickerVisibility: (Boolean) -> Unit,
-    onImageSelected: (Bitmap?) -> Unit
+    onMainUiEvent: (MainUiEvent) -> Unit
 ) {
     var showConfirmationDialog by rememberSaveable { mutableStateOf(false) }
     var launchersResult by remember { mutableStateOf<Bitmap?>(null) }
     val context = LocalContext.current
 
-    LaunchedEffect(launchersResult) {
+    LaunchedEffect(launchersResult, purpose) {
         if (launchersResult != null) {
-            if (polygonPoints.size >= 3 || overlays.isNotEmpty()) {
-                showConfirmationDialog = true
-            } else {
-                onImageSelected(launchersResult)
+            when (purpose) {
+                ImageSelectingPurpose.EDITING_IMAGE -> {
+                    if (polygonPoints.canMakeClosedShape() || overlays.isNotEmpty()) {
+                        showConfirmationDialog = true
+                    } else {
+                        onMainUiEvent(MainUiEvent.SelectImage(launchersResult))
+                    }
+                }
+
+                ImageSelectingPurpose.ADD_MATERIAL -> {
+                    onMainUiEvent(MainUiEvent.AddMaterial(launchersResult))
+                }
             }
         }
     }
@@ -103,7 +115,9 @@ fun ImageSelector(
                 ImageEditor(
                     imageBitmap = imageBmp,
                     overlays = overlays,
-                    currentCursor = currentCursor
+                    currentCursor = currentCursor,
+                    polygonPoints = polygonPoints,
+                    onMainUiEvent = onMainUiEvent
                 )
             }
         }
@@ -136,7 +150,15 @@ fun ImageSelector(
             onDismiss = { showConfirmationDialog = false },
             onConfirm = {
                 launchersResult?.let {
-                    onImageSelected(it)
+                    when (purpose) {
+                        ImageSelectingPurpose.EDITING_IMAGE -> {
+                            onMainUiEvent(MainUiEvent.SelectImage(launchersResult))
+                        }
+
+                        ImageSelectingPurpose.ADD_MATERIAL -> {
+                            onMainUiEvent(MainUiEvent.AddMaterial(launchersResult))
+                        }
+                    }
                 }
                 showConfirmationDialog = false
             })

@@ -117,9 +117,10 @@ fun FunctionItem(
                 FunctionsEnum.UNDO -> !canUndo
                 FunctionsEnum.ADD_LAYER -> overlays.isEmpty()
                 FunctionsEnum.CLEAR_LAYERS -> polygonPointsSize == 0
-                FunctionsEnum.REMOVE_SELECTION -> overlays.isEmpty() || polygonPointsSize < 3 || (selectedOverlay != null && selectedOverlay.material != 1)
+                FunctionsEnum.REMOVE_SELECTION -> overlays.isEmpty() || polygonPointsSize < 3 || (selectedOverlay != null && selectedOverlay.material != -1)
                 FunctionsEnum.MOVE_TO_FRONT -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(selectedOverlay) == overlays.lastIndex
                 FunctionsEnum.MOVE_TO_BACK -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(selectedOverlay) == 0
+                FunctionsEnum.ROTATE_LEFT, FunctionsEnum.ROTATE_RIGHT -> selectedOverlay == null
                 else -> baseImage == null
             }
         }

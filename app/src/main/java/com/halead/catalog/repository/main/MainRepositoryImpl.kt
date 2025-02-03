@@ -21,6 +21,11 @@ class MainRepositoryImpl @Inject constructor(
         )
     }
 
+    /**
+     * Not Implemented
+     */
+    override fun addMaterial(bitmap: Bitmap?) {}
+
     override fun getBitmap(imageResId: Int): Flow<Result<Bitmap?>> = flow {
         timber("Materials", "repo getBitmap() imageRes=$imageResId")
         emit(

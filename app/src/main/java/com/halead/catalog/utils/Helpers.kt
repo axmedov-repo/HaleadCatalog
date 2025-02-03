@@ -1,5 +1,6 @@
 package com.halead.catalog.utils
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -72,3 +73,18 @@ fun timberE(message: String) {
 fun <T> Stack<T>.peekOrNull(): T? {
     return if (this.isEmpty()) null else this.peek()
 }
+
+fun Bitmap.isPanoramic(): Boolean {
+    val aspectRatio = this.width.toFloat() / this.height.toFloat()
+    timber("isPanoramic", "${aspectRatio > 2.0}")
+    return aspectRatio > 2.0  // Consider it panoramic if width is more than 2x height
+}
+
+fun findPolygonCenter(points: List<Offset>): Offset {
+    val sumX = points.sumOf { it.x.toDouble() }
+    val sumY = points.sumOf { it.y.toDouble() }
+    return Offset((sumX / points.size).toFloat(), (sumY / points.size).toFloat())
+}
+
+fun List<Offset>.canMakeClosedShape(): Boolean = this.size >= 3
+fun List<Offset>.isQuadrilateral(): Boolean = this.size == 4
