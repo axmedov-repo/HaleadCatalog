@@ -63,9 +63,9 @@ private fun MainScreenContent(
 ) {
     var imageSelectingPurpose by remember { mutableStateOf(ImageSelectingPurpose.EDITING_IMAGE) }
     var showImagePickerDialog by rememberSaveable { mutableStateOf(false) }
-    val isPrimaryButtonEnabled by remember(uiState.selectedMaterial, uiState.imageBmp) {
+    val isPrimaryButtonEnabled by remember(uiState.selectedMaterial, uiState.imageBmp, uiState.polygonPoints) {
         derivedStateOf {
-            uiState.selectedMaterial != null && uiState.imageBmp != null
+            uiState.selectedMaterial != null && uiState.imageBmp != null && uiState.polygonPoints.canMakeClosedShape()
         }
     }
     val primaryButtonText by remember(

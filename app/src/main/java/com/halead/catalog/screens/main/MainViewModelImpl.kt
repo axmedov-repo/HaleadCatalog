@@ -29,7 +29,6 @@ import com.halead.catalog.utils.findPolygonCenter
 import com.halead.catalog.utils.getClippedMaterial
 import com.halead.catalog.utils.getTemporaryClippedOverlay
 import com.halead.catalog.utils.isQuadrilateral
-import com.halead.catalog.utils.rotatePoint
 import com.halead.catalog.utils.rotatePoints
 import com.halead.catalog.utils.timber
 import com.halead.catalog.utils.timberE
@@ -446,6 +445,9 @@ class MainViewModelImpl @Inject constructor(
 
             if ((!uiState.isMaterialApplied || uiState.polygonPoints != uiState.currentOverlay?.polygonPoints) && uiState.polygonPoints.canMakeClosedShape()) {
                 loadingApplyMaterialState.value = true
+                val isEditingCurrentOverlay = uiState.currentOverlay != null && (uiState.currentOverlay.polygonPoints.minus(
+                    uiState.polygonPoints.toSet()
+                ).isEmpty())
 
                 val selectedMaterialBmp = uiState.selectedMaterial?.let { material ->
                     mainRepository.getBitmap(material)
@@ -467,23 +469,42 @@ class MainViewModelImpl @Inject constructor(
                     val polygonCenter = async { findPolygonCenter(uiState.polygonPoints) }
 
                     val appliedMaterialBitmap = async(Dispatchers.Default) {
-                        if (isPerspectiveEnabled.value) {
-                            if (uiState.polygonPoints.isQuadrilateral()) {
-                                applyMaterialToQuadrilateral(
-                                    polygonPoints = uiState.polygonPoints,
-                                    materialBitmap = selectedMaterialBmp
-                                )
-                            } else {
-                                applyMaterialToPolygon(
-                                    polygonPoints = uiState.polygonPoints,
-                                    materialBitmap = selectedMaterialBmp
-                                )
+                        when {
+                            isPerspectiveEnabled.value -> {
+                                when {
+                                    isEditingCurrentOverlay && uiState.currentOverlay!!.holePoints.isNotEmpty() ->
+                                        applyMaterialToPolygonWithHoles(
+                                            outerPolygon = uiState.polygonPoints,
+                                            holes = uiState.currentOverlay.holePoints,
+                                            materialBitmap = selectedMaterialBmp
+                                        )
+
+                                    uiState.polygonPoints.isQuadrilateral() ->
+                                        applyMaterialToQuadrilateral(
+                                            polygonPoints = uiState.polygonPoints,
+                                            materialBitmap = selectedMaterialBmp
+                                        )
+
+                                    else ->
+                                        applyMaterialToPolygon(
+                                            polygonPoints = uiState.polygonPoints,
+                                            materialBitmap = selectedMaterialBmp
+                                        )
+                                }
                             }
-                        } else {
-                            getClippedMaterial(
-                                outerPolygon = uiState.polygonPoints,
-                                materialBitmap = selectedMaterialBmp
-                            )
+
+                            isEditingCurrentOverlay && uiState.currentOverlay!!.holePoints.isNotEmpty() ->
+                                getClippedMaterial(
+                                    outerPolygon = uiState.polygonPoints,
+                                    materialBitmap = selectedMaterialBmp,
+                                    holes = uiState.currentOverlay.holePoints
+                                )
+
+                            else ->
+                                getClippedMaterial(
+                                    outerPolygon = uiState.polygonPoints,
+                                    materialBitmap = selectedMaterialBmp
+                                )
                         }
                     }
 
@@ -492,23 +513,20 @@ class MainViewModelImpl @Inject constructor(
                         polygonPoints = uiState.polygonPoints,
                         polygonCenter = polygonCenter.await(),
                         material = uiState.selectedMaterial,
+                        holePoints = if (isEditingCurrentOverlay) uiState.currentOverlay!!.holePoints else emptyList(),
                         hasPerspective = isPerspectiveEnabled.value,
                         offset = offsetOfOverlay.await()
                     )
 
-                    if (uiState.currentOverlay != null && (uiState.currentOverlay.polygonPoints.minus(
-                            newOverlay.polygonPoints.toSet()
-                        ).isEmpty())
-                    ) {
-                        uiState.overlays.indexOf(uiState.currentOverlay)
-                            .takeIf { it != -1 }?.let { index ->
-                                mainUiState.update { state ->
-                                    state.copy(
-                                        overlays = state.overlays.toPersistentList().set(index, newOverlay),
-                                        currentOverlay = newOverlay
-                                    )
-                                }
+                    if (isEditingCurrentOverlay) {
+                        uiState.overlays.indexOf(uiState.currentOverlay).takeIf { it != -1 }?.let { index ->
+                            mainUiState.update { state ->
+                                state.copy(
+                                    overlays = state.overlays.toPersistentList().set(index, newOverlay),
+                                    currentOverlay = newOverlay
+                                )
                             }
+                        }
                     } else {
                         mainUiState.update {
                             it.copy(

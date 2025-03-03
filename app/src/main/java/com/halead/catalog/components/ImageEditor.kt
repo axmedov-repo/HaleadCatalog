@@ -251,7 +251,6 @@ fun ImageEditor(
                     drawCircle(color = SelectedItemColor, center = point, radius = 8f)
                 }
             }
-            drawCircle(color = Color.Red, center = findPolygonCenter(polygonPoints), radius = 8f)
         }
     }
 }

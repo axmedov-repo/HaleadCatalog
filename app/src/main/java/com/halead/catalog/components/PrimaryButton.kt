@@ -14,17 +14,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.halead.catalog.R
 
 @Composable
 fun PrimaryButton(
@@ -62,7 +59,9 @@ fun PrimaryButton(
         ) {
             AutoSizeText(
                 modifier = Modifier.weight(1f),
-                suggestedFontSizes = listOf(14.sp),
+                maxTextSize = 14.sp,
+                softWrap = false,
+                maxLines = 1,
                 text = primaryButtonText,
                 color = textColor,
                 alignment = Alignment.Center
@@ -74,15 +73,16 @@ fun PrimaryButton(
                     strokeWidth = 2.dp,
                     color = Color.White.copy(alpha = 0.4f)
                 )
-            } else if (!isMaterialSelected) {
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    modifier = Modifier.size(16.dp),
-                    tint = Color.White.copy(alpha = 0.4f),
-                    painter = painterResource(R.drawable.ic_arrow_downward),
-                    contentDescription = null
-                )
             }
+//            else if (!isMaterialSelected) {
+//                Spacer(Modifier.width(4.dp))
+//                Icon(
+//                    modifier = Modifier.size(16.dp),
+//                    tint = Color.White.copy(alpha = 0.4f),
+//                    painter = painterResource(R.drawable.ic_arrow_downward),
+//                    contentDescription = null
+//                )
+//            }
         }
     }
 }

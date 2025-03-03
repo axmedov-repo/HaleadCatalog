@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.play.services.cast.framework)
     implementation(libs.androidx.vectordrawable)
+    implementation(libs.androidx.camera.lifecycle)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -91,4 +92,5 @@ dependencies {
 
     // Data Store Preferences
     implementation(libs.androidx.datastore.preferences)
+
 }

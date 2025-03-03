@@ -23,6 +23,7 @@ roomRuntime = "2.6.1"
 smileKotlin = "3.0.0"
 timber = "5.0.1"
 vectordrawable = "1.2.0"
+cameraLifecycle = "1.4.1"
 
 [libraries]
 androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraCoreVersion" }
@@ -59,6 +60,7 @@ play-services-cast-framework = { group = "com.google.android.gms", name = "play-
 androidx-vectordrawable = { group = "androidx.vectordrawable", name = "vectordrawable", version.ref = "vectordrawable" }
 smile-kotlin = { module = "com.github.haifengl:smile-kotlin", version.ref = "smileKotlin" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraLifecycle" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
