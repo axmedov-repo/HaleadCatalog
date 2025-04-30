@@ -22,23 +22,23 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.halead.catalog.ui.theme.AppButtonSize
 
 @Composable
 fun PrimaryButton(
     primaryButtonText: String,
     isPrimaryButtonEnabled: Boolean,
     isMaterialsEmpty: Boolean,
-    isMaterialSelected: Boolean,
-    containerColor: Color = Color.Gray,
     modifier: Modifier = Modifier,
+    containerColor: Color = Color.Gray,
     onClick: () -> Unit
 ) {
     Button(
         modifier = modifier
-            .padding(16.dp)
+            .padding(8.dp)
             .fillMaxWidth()
             .wrapContentHeight()
-            .heightIn(min = 50.dp)
+            .heightIn(min = AppButtonSize)
             .shadow(4.dp, RoundedCornerShape(8.dp))
             .clip(shape = RoundedCornerShape(8.dp))
             .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp)),
@@ -74,15 +74,6 @@ fun PrimaryButton(
                     color = Color.White.copy(alpha = 0.4f)
                 )
             }
-//            else if (!isMaterialSelected) {
-//                Spacer(Modifier.width(4.dp))
-//                Icon(
-//                    modifier = Modifier.size(16.dp),
-//                    tint = Color.White.copy(alpha = 0.4f),
-//                    painter = painterResource(R.drawable.ic_arrow_downward),
-//                    contentDescription = null
-//                )
-//            }
         }
     }
 }

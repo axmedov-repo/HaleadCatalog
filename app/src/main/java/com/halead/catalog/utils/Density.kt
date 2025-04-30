@@ -1,5 +1,7 @@
 package com.halead.catalog.utils
 
+import android.content.Context
+import android.util.TypedValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -200,3 +202,11 @@ fun Density.intOffsetToDpOffset(intOffset: IntOffset) = DpOffset(intOffset.x.toD
 fun IntOffset.toDpOffset() = LocalDensity.current.intOffsetToDpOffset(this)
 
 fun IntOffset.toOffset() = Offset(x.toFloat(), y.toFloat())
+
+fun dpToPx(context: Context, dp: Float): Int {
+    return TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP,
+        dp,
+        context.resources.displayMetrics
+    ).toInt()
+}

@@ -1,9 +1,11 @@
 package com.halead.catalog.data.states
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import com.halead.catalog.data.models.OverlayMaterialModel
 
+@Immutable
 data class MainUiState(
     val imageBmp: ImageBitmap? = null,
     val materials: List<Int> = emptyList(),
@@ -11,11 +13,13 @@ data class MainUiState(
     val overlays: List<OverlayMaterialModel> = emptyList(),
     val polygonPoints: List<Offset> = emptyList(),
     val currentOverlay: OverlayMaterialModel? = null,
+    val isMaterialApplied: Boolean = false,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
-    val isMaterialApplied: Boolean = false,
     val trigger: Boolean = true,
-)
+) {
+    val editorHasImage: Boolean = imageBmp != null
+}
 
 data class TrackedUiState(
     val imageBmp: ImageBitmap?,

@@ -15,20 +15,22 @@ import javax.inject.Singleton
 // Single data store reference
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
+private object PreferenceKeys {
+    val PERSPECTIVE_SWITCH_KEY = booleanPreferencesKey("example_counter")
+}
+
 @Singleton
 class Settings @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val PERSPECTIVE_SWITCH_KEY = booleanPreferencesKey("example_counter")
     val perspectiveSwitchValue: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            // No type safety.
-            preferences[PERSPECTIVE_SWITCH_KEY] ?: true
+            preferences[PreferenceKeys.PERSPECTIVE_SWITCH_KEY] ?: true
         }
 
-    suspend fun changePerspectiveSwitch(value: Boolean) {
+    suspend fun changePerspective(value: Boolean) {
         context.dataStore.edit { settings ->
-            settings[PERSPECTIVE_SWITCH_KEY] = value
+            settings[PreferenceKeys.PERSPECTIVE_SWITCH_KEY] = value
         }
     }
 }

@@ -11,7 +11,7 @@ class DataProvider @Inject constructor() {
         R.drawable.material1,
         R.drawable.material2,
         R.drawable.material3,
-        R.drawable.material6,
+//        R.drawable.material6,
         R.drawable.material4,
         R.drawable.material5,
     )

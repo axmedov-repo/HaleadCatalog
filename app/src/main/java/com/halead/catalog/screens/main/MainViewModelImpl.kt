@@ -1,8 +1,12 @@
 package com.halead.catalog.screens.main
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.halead.catalog.data.RecentAction
@@ -24,6 +28,7 @@ import com.halead.catalog.utils.applyMaterialToPolygonWithHoles
 import com.halead.catalog.utils.applyMaterialToQuadrilateral
 import com.halead.catalog.utils.canMakeClosedShape
 import com.halead.catalog.utils.doPolygonsIntersect
+import com.halead.catalog.utils.dpToPx
 import com.halead.catalog.utils.findMinOffset
 import com.halead.catalog.utils.findPolygonCenter
 import com.halead.catalog.utils.getClippedMaterial
@@ -33,6 +38,7 @@ import com.halead.catalog.utils.rotatePoints
 import com.halead.catalog.utils.timber
 import com.halead.catalog.utils.timberE
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -54,11 +60,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private val WIDTH_DIFF_OF_EDITOR_FULL_SCREEN: Dp = 88.dp
+private val HEIGHT_DIFF_OF_EDITOR_FULL_SCREEN: Dp = 66.dp
+
 @HiltViewModel
 class MainViewModelImpl @Inject constructor(
     private val mainRepository: MainRepository,
     private val recentActions: RecentActions,
-    private val settings: Settings
+    private val settings: Settings,
+    @ApplicationContext private val context: Context,
 ) : MainViewModel, ViewModel() {
     override val mainUiState = MutableStateFlow(MainUiState())
     override val loadingApplyMaterialState = MutableStateFlow(false)
@@ -69,6 +79,12 @@ class MainViewModelImpl @Inject constructor(
     private var isRecentActionSavingEnabled = true
     private var isUndoEnabled: Boolean = true
     private var isRedoEnabled: Boolean = true
+
+    override val isEditorFullScreen = MutableStateFlow(false)
+    private var fullScreenEditorSize: IntSize = IntSize.Zero
+    private var normalEditorSize: IntSize = IntSize.Zero
+    private var hasEditorSizeMeasured = false
+    override val editorSize = MutableStateFlow(normalEditorSize)
 
     init {
         viewModelScope.launch {
@@ -87,7 +103,7 @@ class MainViewModelImpl @Inject constructor(
             MainUiEvent.AllOverlaysDrawn -> allOverlaysDrawn()
             MainUiEvent.ApplyMaterial -> applyMaterial()
             is MainUiEvent.BringHistoryWork -> bringHistoryWork(workModel = mainUiEvent.workModel)
-            is MainUiEvent.ChangeSwitchValue -> changeSwitchValue(value = mainUiEvent.value)
+            is MainUiEvent.ChangePerspective -> changePerspective(value = mainUiEvent.value)
             MainUiEvent.ClearPolygonPoints -> clearPolygonPoints()
             is MainUiEvent.ExtendPolygonPoints -> extendPolygonPoints(offset = mainUiEvent.offset)
             is MainUiEvent.InsertPolygonPoint -> insertPolygonPoint(offset = mainUiEvent.offset)
@@ -113,12 +129,37 @@ class MainViewModelImpl @Inject constructor(
                 index = mainUiEvent.index,
                 offset = mainUiEvent.offset
             )
+
+            is MainUiEvent.EditorSize -> {
+                if (!hasEditorSizeMeasured) {
+                    mainUiEvent.size.takeIf { it != normalEditorSize }?.let {
+                        normalEditorSize = it
+                        fullScreenEditorSize = IntSize(
+                            width = it.width + dpToPx(context, WIDTH_DIFF_OF_EDITOR_FULL_SCREEN.value),
+                            height = it.height + dpToPx(context, HEIGHT_DIFF_OF_EDITOR_FULL_SCREEN.value)
+                        )
+                        updateEditorSize()
+                    }
+                    hasEditorSizeMeasured = true
+                }
+            }
+
+            MainUiEvent.ChangeEditorScreenSize -> {
+                isEditorFullScreen.update { !it }
+                updateEditorSize()
+            }
         }
     }
 
-    private fun changeSwitchValue(value: Boolean) {
+    private fun updateEditorSize() {
+        editorSize.update {
+            if (isEditorFullScreen.value) fullScreenEditorSize else normalEditorSize
+        }
+    }
+
+    private fun changePerspective(value: Boolean) {
         viewModelScope.launch {
-            settings.changePerspectiveSwitch(value)
+            settings.changePerspective(value)
         }
     }
 
@@ -139,7 +180,8 @@ class MainViewModelImpl @Inject constructor(
         return if (overlayPoints.isEmpty() || (mainUiState.value.polygonPoints.minus(overlayPoints).isNotEmpty())) {
             false
         } else {
-            mainUiState.value.currentOverlay?.material == mainUiState.value.selectedMaterial
+            mainUiState.value.currentOverlay?.material == mainUiState.value.selectedMaterial &&
+                    mainUiState.value.currentOverlay?.hasPerspective == isPerspectiveEnabled.value
         }
     }
 
@@ -248,7 +290,7 @@ class MainViewModelImpl @Inject constructor(
                 FunctionsEnum.CLEAR_LAYERS -> {
                     mainUiState.update {
                         it.copy(
-                            overlays = if (it.currentOverlay == null && !isMaterialApplied()) {
+                            overlays = if (it.currentOverlay == null && !it.isMaterialApplied) {
                                 it.overlays
                             } else if (it.overlays.size <= 1) {
                                 emptyList()
@@ -262,20 +304,26 @@ class MainViewModelImpl @Inject constructor(
                 }
 
                 FunctionsEnum.REMOVE_SELECTION -> {
-                    mainUiState.value.polygonPoints.takeIf { it.isNotEmpty() }?.let { polygonToRemove ->
-                        val editingOverlays = HashMap<Int, OverlayMaterialModel>()
+                    mainUiState.value.polygonPoints.takeIf { it.isNotEmpty() }
+                        ?.let { polygonToRemove ->
+                            val editingOverlays = HashMap<Int, OverlayMaterialModel>()
 
-                        for (index in mainUiState.value.overlays.size - 1 downTo 0) {
-                            val overlay = mainUiState.value.overlays[index]
-                            if (doPolygonsIntersect(polygonToRemove, overlay.polygonPoints, overlay.holePoints)) {
-                                editingOverlays[index] = overlay
+                            for (index in mainUiState.value.overlays.size - 1 downTo 0) {
+                                val overlay = mainUiState.value.overlays[index]
+                                if (doPolygonsIntersect(
+                                        polygonToRemove,
+                                        overlay.polygonPoints,
+                                        overlay.holePoints
+                                    )
+                                ) {
+                                    editingOverlays[index] = overlay
+                                }
+                            }
+
+                            if (editingOverlays.isNotEmpty()) {
+                                applyMaterialWithHole(editingOverlays, polygonToRemove)
                             }
                         }
-
-                        if (editingOverlays.isNotEmpty()) {
-                            applyMaterialWithHole(editingOverlays, polygonToRemove)
-                        }
-                    }
                 }
 
                 FunctionsEnum.MOVE_TO_BACK -> {
@@ -347,7 +395,13 @@ class MainViewModelImpl @Inject constructor(
 
             // First rotate the polygon points around their center
             val newPolygonPoints =
-                async { rotatePoints(currentOverlay.polygonPoints, rotationAmount, currentOverlay.polygonCenter) }
+                async {
+                    rotatePoints(
+                        currentOverlay.polygonPoints,
+                        rotationAmount,
+                        currentOverlay.polygonCenter
+                    )
+                }
 
             // Keep the original offset
             val newOverlay = currentOverlay.copy(
@@ -358,7 +412,8 @@ class MainViewModelImpl @Inject constructor(
 
             mainUiState.update {
                 it.copy(
-                    overlays = it.overlays.toPersistentList().set(it.overlays.indexOf(currentOverlay), newOverlay),
+                    overlays = it.overlays.toPersistentList()
+                        .set(it.overlays.indexOf(currentOverlay), newOverlay),
                     currentOverlay = newOverlay,
                     polygonPoints = newPolygonPoints.await()
                 )
@@ -445,9 +500,10 @@ class MainViewModelImpl @Inject constructor(
 
             if ((!uiState.isMaterialApplied || uiState.polygonPoints != uiState.currentOverlay?.polygonPoints) && uiState.polygonPoints.canMakeClosedShape()) {
                 loadingApplyMaterialState.value = true
-                val isEditingCurrentOverlay = uiState.currentOverlay != null && (uiState.currentOverlay.polygonPoints.minus(
-                    uiState.polygonPoints.toSet()
-                ).isEmpty())
+                val isEditingCurrentOverlay =
+                    uiState.currentOverlay != null && (uiState.currentOverlay.polygonPoints.minus(
+                        uiState.polygonPoints.toSet()
+                    ).isEmpty())
 
                 val selectedMaterialBmp = uiState.selectedMaterial?.let { material ->
                     mainRepository.getBitmap(material)
@@ -519,14 +575,16 @@ class MainViewModelImpl @Inject constructor(
                     )
 
                     if (isEditingCurrentOverlay) {
-                        uiState.overlays.indexOf(uiState.currentOverlay).takeIf { it != -1 }?.let { index ->
-                            mainUiState.update { state ->
-                                state.copy(
-                                    overlays = state.overlays.toPersistentList().set(index, newOverlay),
-                                    currentOverlay = newOverlay
-                                )
+                        uiState.overlays.indexOf(uiState.currentOverlay).takeIf { it != -1 }
+                            ?.let { index ->
+                                mainUiState.update { state ->
+                                    state.copy(
+                                        overlays = state.overlays.toPersistentList()
+                                            .set(index, newOverlay),
+                                        currentOverlay = newOverlay
+                                    )
+                                }
                             }
-                        }
                     } else {
                         mainUiState.update {
                             it.copy(
@@ -540,7 +598,10 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
-    private fun applyMaterialWithHole(editingOverlays: Map<Int, OverlayMaterialModel>, holePoints: List<Offset>) {
+    private fun applyMaterialWithHole(
+        editingOverlays: Map<Int, OverlayMaterialModel>,
+        holePoints: List<Offset>
+    ) {
         viewModelScope.launch {
             if (!holePoints.canMakeClosedShape()) return@launch // Early exit if hole is invalid
 
@@ -650,9 +711,11 @@ class MainViewModelImpl @Inject constructor(
                 // Update the polygon points in the ViewModel
                 mainUiState.update { state ->
                     state.copy(
-                        overlays = state.currentOverlay?.let { state.overlays - it } ?: state.overlays,
+                        overlays = state.currentOverlay?.let { state.overlays - it }
+                            ?: state.overlays,
                         currentOverlay = null,
-                        polygonPoints = state.polygonPoints.toPersistentList().add(nextIndex, offset)
+                        polygonPoints = state.polygonPoints.toPersistentList()
+                            .add(nextIndex, offset)
                     )
                 }
             } else {
@@ -669,7 +732,11 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
-    private fun updateCurrentOverlayTransform(zoomChange: Float, offsetChange: Offset, rotationChange: Float) {
+    private fun updateCurrentOverlayTransform(
+        zoomChange: Float,
+        offsetChange: Offset,
+        rotationChange: Float
+    ) {
         viewModelScope.launch {
             val currentOverlay = mainUiState.value.currentOverlay ?: return@launch
             val overlays = mainUiState.value.overlays.toPersistentList()
@@ -702,7 +769,10 @@ class MainViewModelImpl @Inject constructor(
             val currentOverlay = mainUiState.value.currentOverlay ?: return@launch
             val newPolygonPoints = async { currentOverlay.polygonPoints.map { it + dragAmount } }
             val newPosition = async { currentOverlay.offset + dragAmount }
-            val updatedOverlay = currentOverlay.copy(polygonPoints = newPolygonPoints.await(), offset = newPosition.await())
+            val updatedOverlay = currentOverlay.copy(
+                polygonPoints = newPolygonPoints.await(),
+                offset = newPosition.await()
+            )
 
             timber("PIP_CHECK", "updatedOverlay=$updatedOverlay")
             mainUiState.update { state ->
@@ -728,7 +798,10 @@ class MainViewModelImpl @Inject constructor(
         var newState = mainUiState.value
         when (recentAction) {
             is RecentAction.UiState -> {
-                timber("RecentActionsLog", "reAct condition=${(mainUiState.value != recentAction.mainUiState)}")
+                timber(
+                    "RecentActionsLog",
+                    "reAct condition=${(mainUiState.value != recentAction.mainUiState)}"
+                )
                 newState = recentAction.mainUiState
             }
 

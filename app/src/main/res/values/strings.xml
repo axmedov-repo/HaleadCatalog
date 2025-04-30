@@ -1,3 +1,11 @@
 <resources>
-    <string name="app_name">HaleadCatalog</string>
+    <string name="app_name">Halead Catalog</string>
+    <string name="upload_new_image_question">Upload New Image?</string>
+    <string name="current_drawing_will_be_lost">All your current drawings will be lost.</string>
+    <string name="browse_or_capture_image">Browse or Capture Image</string>
+    <string name="loading_materials">Loading Materials</string>
+    <string name="select_material">Select Material</string>
+    <string name="select_region">Select Region</string>
+    <string name="material_applied">Material Applied</string>
+    <string name="apply_material">Apply Material</string>
 </resources>

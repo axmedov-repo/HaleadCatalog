@@ -1,15 +1,10 @@
 package com.halead.catalog.components
 
 import android.Manifest
-import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
-import android.util.Log
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -40,78 +35,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.halead.catalog.BuildConfig
+import com.halead.catalog.R
 import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.ImageSelectingPurpose
 import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.ui.events.MainUiEvent
+import com.halead.catalog.ui.theme.AppButtonSize
 import com.halead.catalog.ui.theme.ButtonColor
 import com.halead.catalog.utils.canMakeClosedShape
 import com.halead.catalog.utils.createImageFile
 import com.halead.catalog.utils.getBitmapFromUri
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import java.io.BufferedOutputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.Objects
-
-fun saveBitmapToFile(context: Context, bitmap: Bitmap, fileNamePrefix: String = "IMG"): Uri? {
-    try {
-        // Create timestamp for unique filename
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val fileName = "${fileNamePrefix}_$timestamp.bmp"
-
-        // For API 29 and above (Android 10+), use MediaStore
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, "image/bmp")
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/HaleadCatalog")
-            }
-
-            val uri = context.contentResolver.insert(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues
-            ) ?: return null
-
-            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-            }
-
-            return uri
-        } else {
-            // For older Android versions
-            val imagesDir = context.getExternalFilesDir("Pictures/HaleadCatalog")
-                ?: context.filesDir
-            if (!imagesDir.exists()) imagesDir.mkdirs()
-
-            val file = File(imagesDir, fileName)
-            FileOutputStream(file).use { outputStream ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
-                outputStream.flush()
-            }
-
-            // Create content URI using FileProvider
-            return FileProvider.getUriForFile(
-                context,
-                "${BuildConfig.APPLICATION_ID}.provider",
-                file
-            )
-        }
-    } catch (e: Exception) {
-        Log.e("ImageSaver", "Error saving bitmap: ${e.message}")
-        return null
-    }
-}
+import com.halead.catalog.utils.showToast
+import com.halead.catalog.utils.timber
 
 @Composable
 fun ImageSelector(
@@ -122,12 +64,22 @@ fun ImageSelector(
     modifier: Modifier = Modifier,
     showImagePicker: Boolean = false,
     currentCursor: CursorData,
+    editorSize: IntSize,
     changeImagePickerVisibility: (Boolean) -> Unit,
     onMainUiEvent: (MainUiEvent) -> Unit
 ) {
-    var showConfirmationDialog by rememberSaveable { mutableStateOf(false) }
-    var launchersResult by remember { mutableStateOf<Bitmap?>(null) }
     val context = LocalContext.current
+    var showConfirmationDialog by rememberSaveable { mutableStateOf(false) }
+    var hasCameraPermission by rememberSaveable { mutableStateOf(false) }
+    var launchersResult by remember { mutableStateOf<Bitmap?>(null) }
+    var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+
+    LaunchedEffect(Unit) {
+        hasCameraPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
 
     LaunchedEffect(launchersResult, purpose) {
         if (launchersResult != null) {
@@ -147,115 +99,22 @@ fun ImageSelector(
         }
     }
 
-//    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-//        launchersResult = bitmap
-//    }
-
-    // Store the imageUri in rememberSaveable to preserve it across recompositions
-    var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
-
-    // Track camera permission state for better UX
-    var hasCameraPermission by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        hasCameraPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-
-    // Camera launcher using TakePicture contract
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture(),
-        onResult = { success ->
-            if (success) {
-                try {
-                    imageUri?.let { uri ->
-                        Log.d("ImageSelector", "Camera capture successful, processing URI: $uri")
-                        val bitmap = getBitmapFromUri(context, uri)
-
-                        if (bitmap != null) {
-                            Log.d("ImageSelector", "Successfully converted URI to bitmap")
-                            launchersResult = bitmap
-
-                            // Save as bitmap if needed
-//                            try {
-//                                val outputDir = context.getExternalFilesDir("Pictures") ?: context.filesDir
-//                                val outputFile = File(outputDir, "capture_${System.currentTimeMillis()}.bmp")
-//
-//                                FileOutputStream(outputFile).use { out ->
-//                                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-//                                    out.flush()
-//                                }
-//
-//                                Log.d("ImageSelector", "Saved bitmap to: ${outputFile.absolutePath}")
-//                            } catch (e: Exception) {
-//                                Log.e("ImageSelector", "Failed to save bitmap: ${e.message}")
-//                            }
-
-                            CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val outputDir = context.getExternalFilesDir("Pictures") ?: context.filesDir
-                                    val outputFile = File(outputDir, "capture_${System.currentTimeMillis()}.bmp")
-
-                                    // Use a buffered output stream for better performance
-                                    BufferedOutputStream(FileOutputStream(outputFile)).use { out ->
-                                        // Note: You're saving as PNG (not BMP despite the file extension)
-                                        // PNG compression can be slow for large bitmaps
-                                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-                                        // No need to call flush() when using .use() as it handles closing properly
-                                    }
-                                } catch (e: IOException) {
-                                    Log.e("BitmapSave", "Error saving bitmap", e)
-                                }
-                            }
-                        } else {
-                            Log.e("ImageSelector", "Failed to get bitmap from URI: $uri")
-                            Toast.makeText(context, "Failed to process captured image", Toast.LENGTH_SHORT).show()
-                        }
-                    } ?: run {
-                        Log.e("ImageSelector", "Camera returned success but URI is null")
-                        Toast.makeText(context, "Failed to capture image: missing URI", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    Log.e("ImageSelector", "Exception processing camera result: ${e.message}", e)
-                    Toast.makeText(context, "Error processing captured image", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Log.d("ImageSelector", "Camera capture cancelled or failed")
-                Toast.makeText(context, "Image capture cancelled", Toast.LENGTH_SHORT).show()
-            }
-        }
-    )
+    val cameraLauncher = rememberCameraLauncher(imageUri, context) { launchersResult = it }
+    val galleryLauncher = rememberGalleryLauncher(context) { launchersResult = it }
 
     // Function to safely create file and URI for camera
     fun launchCamera(context: Context) {
         try {
-            Log.d("ImageSelector", "Preparing to launch camera")
-
-            // Create a temporary file to store the camera output
             val photoFile = context.createImageFile()
-            Log.d("ImageSelector", "Created temp file: ${photoFile.absolutePath}")
-
-            // Get URI from file
             val uri = FileProvider.getUriForFile(
                 context,
                 "${BuildConfig.APPLICATION_ID}.provider",
                 photoFile
             )
-
-            Log.d("ImageSelector", "Created URI for camera: $uri")
             imageUri = uri
-
-            // Launch camera with this URI
             cameraLauncher.launch(uri)
         } catch (e: Exception) {
-            Log.e("ImageSelector", "Error launching camera: ${e.message}", e)
-            Toast.makeText(
-                context,
-                "Could not open camera: ${e.message}",
-                Toast.LENGTH_LONG
-            ).show()
+            showToast(context, "Could not open camera: ${e.message}")
         }
     }
 
@@ -265,24 +124,16 @@ fun ImageSelector(
         onResult = { granted ->
             hasCameraPermission = granted
             if (granted) {
-                Log.d("ImageSelector", "Camera permission granted")
-                Toast.makeText(context, "Camera permission granted", Toast.LENGTH_SHORT).show()
                 launchCamera(context)
             } else {
-                Log.d("ImageSelector", "Camera permission denied")
-                Toast.makeText(context, "Camera permission required to take photos", Toast.LENGTH_SHORT).show()
+                showToast(context, "Camera permission required to take photos")
             }
         }
     )
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { galleryUri ->
-        launchersResult = getBitmapFromUri(context, galleryUri)
-    }
-
     Box(
         modifier
             .fillMaxSize()
-            .padding(bottom = 16.dp, start = 16.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(Color.White),
         contentAlignment = Alignment.Center
@@ -295,24 +146,14 @@ fun ImageSelector(
             verticalArrangement = Arrangement.Center
         ) {
             if (imageBmp == null) {
-                Button(
-                    modifier = Modifier
-                        .height(50.dp)
-                        .shadow(4.dp, RoundedCornerShape(8.dp))
-                        .clip(shape = RoundedCornerShape(8.dp))
-                        .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp)),
-                    shape = RoundedCornerShape(8.dp),
-                    onClick = { changeImagePickerVisibility(true) },
-                    colors = ButtonDefaults.buttonColors(containerColor = ButtonColor)
-                ) {
-                    Text("Browse or Capture Image", color = Color.White)
-                }
+                BrowseOrCaptureImageButton { changeImagePickerVisibility(true) }
             } else {
                 ImageEditor(
                     imageBitmap = imageBmp,
                     overlays = overlays,
                     currentCursor = currentCursor,
                     polygonPoints = polygonPoints,
+                    editorSize = editorSize,
                     onMainUiEvent = onMainUiEvent
                 )
             }
@@ -343,25 +184,112 @@ fun ImageSelector(
             }
         )
 
-        ConfirmationDialog(showDialog = showConfirmationDialog,
-            title = "Upload New Image?",
-            message = "All your current drawings will be lost.",
-            dismissButtonEnabled = true,
-            confirmButtonColor = ButtonColor,
-            onDismiss = { showConfirmationDialog = false },
-            onConfirm = {
-                launchersResult?.let {
-                    when (purpose) {
-                        ImageSelectingPurpose.EDITING_IMAGE -> {
-                            onMainUiEvent(MainUiEvent.SelectImage(launchersResult))
-                        }
+        if (showConfirmationDialog) {
+            ConfirmationDialog(
+                title = stringResource(R.string.upload_new_image_question),
+                message = stringResource(R.string.current_drawing_will_be_lost),
+                dismissButtonEnabled = true,
+                colors = ConfirmationDialogDefaults.colors(confirmButtonColor = ButtonColor),
+                onDismiss = { showConfirmationDialog = false },
+                onConfirm = {
+                    launchersResult?.let {
+                        when (purpose) {
+                            ImageSelectingPurpose.EDITING_IMAGE -> {
+                                onMainUiEvent(MainUiEvent.SelectImage(launchersResult))
+                            }
 
-                        ImageSelectingPurpose.ADD_MATERIAL -> {
-                            onMainUiEvent(MainUiEvent.AddMaterial(launchersResult))
+                            ImageSelectingPurpose.ADD_MATERIAL -> {
+                                onMainUiEvent(MainUiEvent.AddMaterial(launchersResult))
+                            }
                         }
                     }
+                    showConfirmationDialog = false
                 }
-                showConfirmationDialog = false
-            })
+            )
+        }
     }
+}
+
+@Composable
+private fun BrowseOrCaptureImageButton(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Button(
+        modifier = modifier
+            .height(AppButtonSize)
+            .shadow(4.dp, RoundedCornerShape(8.dp))
+            .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp))
+            .padding(2.dp),
+        shape = RoundedCornerShape(6.dp),
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(containerColor = ButtonColor)
+    ) {
+        Text(
+            text = stringResource(R.string.browse_or_capture_image),
+            fontSize = 14.sp,
+            color = Color.White
+        )
+    }
+}
+
+@Composable
+private fun rememberCameraLauncher(
+    imageUri: Uri?,
+    context: Context,
+    onResult: (Bitmap) -> Unit
+) =
+    /*    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+            launchersResult = bitmap
+        }*/
+    rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+        onResult = { success ->
+            if (success) {
+                try {
+                    imageUri?.let { uri ->
+                        timber("ImageSelector", "Camera capture successful, processing URI: $uri")
+                        val bitmap = getBitmapFromUri(context, uri)
+
+                        if (bitmap != null) {
+                            timber("ImageSelector", "Successfully converted URI to bitmap")
+                            onResult(bitmap)
+
+                            // Save bitmap if need
+                            /*CoroutineScope(Dispatchers.IO).launch {
+                                try {
+                                    val outputDir =
+                                        context.getExternalFilesDir("Pictures") ?: context.filesDir
+                                    val outputFile =
+                                        File(outputDir, "capture_${System.currentTimeMillis()}.bmp")
+
+                                    BufferedOutputStream(FileOutputStream(outputFile)).use { out ->
+                                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+
+                                    }
+                                } catch (e: IOException) {
+                                    timberE("Error saving bitmap")
+                                }
+                            }*/
+                        } else {
+                            showToast(context, "Failed to process captured image")
+                        }
+                    } ?: run {
+                        showToast(context, "Failed to capture image: missing URI")
+                    }
+                } catch (e: Exception) {
+                    showToast(context, "Error processing captured image")
+                }
+            } else {
+                showToast(context, "Image capture cancelled")
+            }
+        }
+    )
+
+@Composable
+private fun rememberGalleryLauncher(
+    context: Context,
+    onResult: (Bitmap?) -> Unit
+) = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { galleryUri ->
+    onResult(getBitmapFromUri(context, galleryUri))
 }

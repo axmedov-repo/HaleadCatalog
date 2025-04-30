@@ -1,9 +1,14 @@
 package com.halead.catalog.utils
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
@@ -44,21 +49,15 @@ fun getRegionSize(regionPoints: List<Offset>): Size {
     return Size(width, height)
 }
 
-@Composable
-fun getAspectRatioFromResource(resourceId: Int): Float {
-    val context = LocalContext.current
-
-    // Use remember to avoid recalculating on recomposition
-    return remember(resourceId) {
-        val options = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true // Only decode the dimensions
-        }
-        BitmapFactory.decodeResource(context.resources, resourceId, options)
-        if (options.outWidth > 0 && options.outHeight > 0) {
-            options.outWidth.toFloat() / options.outHeight.toFloat()
-        } else {
-            1f // Default aspect ratio if dimensions are invalid
-        }
+fun getAspectRatioFromResource(resourceId: Int, context: Context): Float {
+    val options = BitmapFactory.Options().apply {
+        inJustDecodeBounds = true // Only decode the dimensions
+    }
+    BitmapFactory.decodeResource(context.resources, resourceId, options)
+    return if (options.outWidth > 0 && options.outHeight > 0) {
+        options.outWidth.toFloat() / options.outHeight.toFloat()
+    } else {
+        1f // Default aspect ratio if dimensions are invalid
     }
 }
 
@@ -68,6 +67,10 @@ fun timber(tag: String = "TTT", message: String) {
 
 fun timberE(message: String) {
     Timber.e(message)
+}
+
+fun showToast(context: Context, message: String, duration: Int = Toast.LENGTH_SHORT) {
+    Toast.makeText(context, message, duration).show()
 }
 
 fun <T> Stack<T>.peekOrNull(): T? {
@@ -88,3 +91,14 @@ fun findPolygonCenter(points: List<Offset>): Offset {
 
 fun List<Offset>.canMakeClosedShape(): Boolean = this.size >= 3
 fun List<Offset>.isQuadrilateral(): Boolean = this.size == 4
+
+@Composable
+fun Modifier.noRippleClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier {
+    return this.clickable(
+        enabled = enabled,
+        indication = null, // Disable ripple effect
+        interactionSource = remember { MutableInteractionSource() } // Required for clickable
+    ) {
+        onClick()
+    }
+}

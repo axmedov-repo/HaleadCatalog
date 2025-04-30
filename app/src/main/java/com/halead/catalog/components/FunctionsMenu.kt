@@ -3,16 +3,13 @@ package com.halead.catalog.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -37,7 +35,9 @@ import com.halead.catalog.data.enums.FunctionsEnum
 import com.halead.catalog.data.enums.cursorTypesList
 import com.halead.catalog.data.enums.functionsList
 import com.halead.catalog.data.models.OverlayMaterialModel
+import com.halead.catalog.ui.theme.AppButtonSize
 import com.halead.catalog.ui.theme.SelectedItemColor
+import com.halead.catalog.utils.noRippleClickable
 
 @Composable
 fun FunctionsMenu(
@@ -52,46 +52,40 @@ fun FunctionsMenu(
     onFunctionClicked: (FunctionData) -> Unit,
     onCursorClicked: (CursorData) -> Unit,
 ) {
-    Row(
+    LazyRow(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(8.dp),
         modifier = modifier
             .fillMaxWidth()
-            .wrapContentHeight()
-            .background(Color.LightGray),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start
+            .background(Color.LightGray)
     ) {
-        LazyRow(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(16.dp)
-        ) {
-            items(functionsList) { functionData ->
-                FunctionItem(
-                    data = functionData,
-                    canUndo = canUndo,
-                    canRedo = canRedo,
-                    overlays = overlays,
-                    polygonPointsSize = polygonPointsSize,
-                    selectedOverlay = selectedOverlay,
-                    baseImage = baseImage,
-                    onFunctionClicked = { onFunctionClicked(functionData) }
-                )
-            }
-            item {
-                VerticalDivider(
-                    Modifier.height(40.dp),
-                    thickness = 2.dp,
-                    color = Color.Gray
-                )
-            }
-            items(cursorTypesList) { cursorData ->
-                CursorItem(
-                    data = cursorData,
-                    selectedData = selectedCursor,
-                    baseImage = baseImage,
-                    onCursorClicked = { onCursorClicked(cursorData) }
-                )
-            }
+        items(functionsList, key = { it.type }) { functionData ->
+            FunctionItem(
+                data = functionData,
+                canUndo = canUndo,
+                canRedo = canRedo,
+                overlays = overlays,
+                polygonPointsSize = polygonPointsSize,
+                selectedOverlay = selectedOverlay,
+                baseImage = baseImage,
+                onFunctionClicked = { onFunctionClicked(functionData) }
+            )
+        }
+        item {
+            VerticalDivider(
+                Modifier.height(40.dp),
+                thickness = 2.dp,
+                color = Color.Gray
+            )
+        }
+        items(cursorTypesList, key = { it.type }) { cursorData ->
+            CursorItem(
+                data = cursorData,
+                selectedData = selectedCursor,
+                baseImage = baseImage,
+                onCursorClicked = { onCursorClicked(cursorData) }
+            )
         }
     }
 }
@@ -108,7 +102,7 @@ fun FunctionItem(
     onFunctionClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val disabled by remember(
+    val isDisabled by remember(
         data.type, canUndo, canRedo, overlays, polygonPointsSize, selectedOverlay, baseImage
     ) {
         derivedStateOf {
@@ -118,31 +112,35 @@ fun FunctionItem(
                 FunctionsEnum.ADD_LAYER -> overlays.isEmpty()
                 FunctionsEnum.CLEAR_LAYERS -> polygonPointsSize == 0
                 FunctionsEnum.REMOVE_SELECTION -> overlays.isEmpty() || polygonPointsSize < 3 || (selectedOverlay != null && selectedOverlay.material != -1)
-                FunctionsEnum.MOVE_TO_FRONT -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(selectedOverlay) == overlays.lastIndex
-                FunctionsEnum.MOVE_TO_BACK -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(selectedOverlay) == 0
+                FunctionsEnum.MOVE_TO_FRONT -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(
+                    selectedOverlay
+                ) == overlays.lastIndex
+
+                FunctionsEnum.MOVE_TO_BACK -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(
+                    selectedOverlay
+                ) == 0
+
                 FunctionsEnum.ROTATE_LEFT, FunctionsEnum.ROTATE_RIGHT -> selectedOverlay == null
                 else -> baseImage == null
             }
         }
     }
 
-    val alpha = remember(disabled) { if (disabled) 0.4f else 1.0f }
-
     Image(
         modifier = modifier
-            .size(50.dp)
+            .size(AppButtonSize)
             .aspectRatio(1f)
             .shadow(4.dp, RoundedCornerShape(8.dp))
             .clip(shape = RoundedCornerShape(8.dp))
             .background(Color.Gray)
             .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp))
-            .clickable(enabled = !disabled) { onFunctionClicked() }
+            .noRippleClickable(enabled = !isDisabled) { onFunctionClicked() }
             .padding(8.dp),
         contentScale = ContentScale.Crop,
         contentDescription = null,
         colorFilter = ColorFilter.tint(Color.White),
         painter = painterResource(data.img),
-        alpha = alpha
+        alpha = if (isDisabled) 0.4f else 1.0f
     )
 }
 
@@ -154,29 +152,26 @@ fun CursorItem(
     onCursorClicked: (CursorData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val background by remember(selectedData?.type, data.type, baseImage) {
-        derivedStateOf {
-            if (selectedData?.type == data.type && baseImage != null) SelectedItemColor else Color.Gray
-        }
-    }
-
     val enabled by remember(baseImage) { derivedStateOf { baseImage != null } }
-    val alpha = remember(enabled) { if (enabled) 1.0f else 0.4f }
 
     Image(
         modifier = modifier
-            .size(50.dp)
+            .size(AppButtonSize)
             .aspectRatio(1f)
             .shadow(4.dp, RoundedCornerShape(8.dp))
             .clip(shape = RoundedCornerShape(8.dp))
-            .background(background)
+            .drawBehind {
+                drawRoundRect(
+                    if (selectedData?.type == data.type && baseImage != null) SelectedItemColor else Color.Gray
+                )
+            }
             .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled) { onCursorClicked(data) }
+            .noRippleClickable(enabled = enabled) { onCursorClicked(data) }
             .padding(8.dp),
         contentScale = ContentScale.Crop,
         contentDescription = null,
         colorFilter = ColorFilter.tint(Color.White),
         painter = painterResource(data.img),
-        alpha = alpha
+        alpha = if (enabled) 1.0f else 0.4f
     )
 }
