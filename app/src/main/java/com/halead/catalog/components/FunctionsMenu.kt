@@ -6,14 +6,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -36,6 +36,7 @@ import com.halead.catalog.data.enums.cursorTypesList
 import com.halead.catalog.data.enums.functionsList
 import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.ui.theme.AppButtonSize
+import com.halead.catalog.ui.theme.BorderThickness
 import com.halead.catalog.ui.theme.SelectedItemColor
 import com.halead.catalog.utils.noRippleClickable
 
@@ -52,15 +53,24 @@ fun FunctionsMenu(
     onFunctionClicked: (FunctionData) -> Unit,
     onCursorClicked: (CursorData) -> Unit,
 ) {
+    val functions = remember {
+        functionsList.filter { it.type !in listOf(FunctionsEnum.UNDO, FunctionsEnum.REDO) }
+    }
+
     LazyRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(8.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color.LightGray)
+        modifier = modifier.fillMaxWidth()
     ) {
-        items(functionsList, key = { it.type }) { functionData ->
+        items(
+            functions,
+            key = { it.type }) { functionData ->
+
+            val rememberFunctionClicked = remember(functionData) {
+                { onFunctionClicked(functionData) }
+            }
+
             FunctionItem(
                 data = functionData,
                 canUndo = canUndo,
@@ -69,14 +79,66 @@ fun FunctionsMenu(
                 polygonPointsSize = polygonPointsSize,
                 selectedOverlay = selectedOverlay,
                 baseImage = baseImage,
-                onFunctionClicked = { onFunctionClicked(functionData) }
+                onFunctionClicked = rememberFunctionClicked
             )
         }
-        item {
-            VerticalDivider(
-                Modifier.height(40.dp),
-                thickness = 2.dp,
-                color = Color.Gray
+//        item {
+//            VerticalDivider(
+//                Modifier.height(AppButtonSize).padding(vertical = 4.dp).clip(RoundedCornerShape(2.dp)),
+//                thickness = 2.dp,
+//                color = Color.Gray
+//            )
+//        }
+//        items(cursorTypesList, key = { it.type }) { cursorData ->
+//            CursorItem(
+//                data = cursorData,
+//                selectedData = selectedCursor,
+//                baseImage = baseImage,
+//                onCursorClicked = { onCursorClicked(cursorData) }
+//            )
+//        }
+    }
+}
+
+@Composable
+fun CursorsMenu(
+    modifier: Modifier = Modifier,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    baseImage: ImageBitmap?,
+    overlays: List<OverlayMaterialModel>,
+    polygonPointsSize: Int,
+    selectedOverlay: OverlayMaterialModel?,
+    selectedCursor: CursorData?,
+    onFunctionClicked: (FunctionData) -> Unit,
+    onCursorClicked: (CursorData) -> Unit,
+) {
+    val functions = remember {
+        functionsList.filter { it.type in listOf(FunctionsEnum.UNDO, FunctionsEnum.REDO) }
+    }
+    LazyColumn(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(start = 8.dp, top = 8.dp, bottom = 8.dp),
+        modifier = modifier.fillMaxHeight()
+    ) {
+        items(
+            functions,
+            key = { it.type }) { functionData ->
+
+            val rememberFunctionClicked = remember(functionData) {
+                { onFunctionClicked(functionData) }
+            }
+
+            FunctionItem(
+                data = functionData,
+                canUndo = canUndo,
+                canRedo = canRedo,
+                overlays = overlays,
+                polygonPointsSize = polygonPointsSize,
+                selectedOverlay = selectedOverlay,
+                baseImage = baseImage,
+                onFunctionClicked = rememberFunctionClicked
             )
         }
         items(cursorTypesList, key = { it.type }) { cursorData ->
@@ -84,9 +146,10 @@ fun FunctionsMenu(
                 data = cursorData,
                 selectedData = selectedCursor,
                 baseImage = baseImage,
-                onCursorClicked = { onCursorClicked(cursorData) }
+                onCursorClicked = onCursorClicked
             )
         }
+
     }
 }
 
@@ -133,8 +196,8 @@ fun FunctionItem(
             .shadow(4.dp, RoundedCornerShape(8.dp))
             .clip(shape = RoundedCornerShape(8.dp))
             .background(Color.Gray)
-            .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp))
-            .noRippleClickable(enabled = !isDisabled) { onFunctionClicked() }
+            .border(BorderThickness, Color.White, shape = RoundedCornerShape(8.dp))
+            .noRippleClickable(enabled = !isDisabled, onClick = onFunctionClicked)
             .padding(8.dp),
         contentScale = ContentScale.Crop,
         contentDescription = null,
@@ -165,7 +228,7 @@ fun CursorItem(
                     if (selectedData?.type == data.type && baseImage != null) SelectedItemColor else Color.Gray
                 )
             }
-            .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp))
+            .border(BorderThickness, Color.White, shape = RoundedCornerShape(8.dp))
             .noRippleClickable(enabled = enabled) { onCursorClicked(data) }
             .padding(8.dp),
         contentScale = ContentScale.Crop,

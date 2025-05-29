@@ -7,7 +7,7 @@ import javax.inject.Singleton
 @Singleton
 class DataProvider @Inject constructor() {
     val materialsResIds = listOf<Int>(
-        R.drawable.material,
+//        R.drawable.material,
         R.drawable.material1,
         R.drawable.material2,
         R.drawable.material3,

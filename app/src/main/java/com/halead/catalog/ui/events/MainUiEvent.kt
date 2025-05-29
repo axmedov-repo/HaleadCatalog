@@ -33,4 +33,5 @@ sealed class MainUiEvent {
         val offsetChange: Offset,
         val rotationChange: Float
     ) : MainUiEvent()
+    data object ResetCurrentImage : MainUiEvent()
 }

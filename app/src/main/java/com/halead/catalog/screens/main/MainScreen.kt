@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,16 +26,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.halead.catalog.R
+import com.halead.catalog.components.CursorsMenu
 import com.halead.catalog.components.FunctionsMenu
 import com.halead.catalog.components.ImageSelector
 import com.halead.catalog.components.MaterialsMenu
@@ -44,7 +47,7 @@ import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.FunctionData
 import com.halead.catalog.data.enums.FunctionsEnum
 import com.halead.catalog.data.enums.ImageSelectingPurpose
-import com.halead.catalog.data.states.MainUiState
+import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.ui.events.MainUiEvent
 import com.halead.catalog.ui.theme.ButtonColor
 import com.halead.catalog.ui.theme.SelectedItemColor
@@ -55,21 +58,32 @@ import com.halead.catalog.utils.timber
 fun MainScreen(modifier: Modifier = Modifier) {
     val viewModel: MainViewModel = viewModel<MainViewModelImpl>()
 
-    val uiState by viewModel.mainUiState.collectAsState()
+    val uiState = viewModel.mainUiState.collectAsState().value
     val loadingApplyMaterial by viewModel.loadingApplyMaterialState.collectAsState()
     val currentCursor by viewModel.currentCursorState.collectAsState()
     val perspectiveSwitchValue by viewModel.isPerspectiveEnabled.collectAsState()
-    val isEditorFullScreen by viewModel.isEditorFullScreen.collectAsState()
-    val editorSize by viewModel.editorSize.collectAsState()
+    val editorScreenState by viewModel.editorScreenState.collectAsState()
+
+    LaunchedEffect(editorScreenState.isFullScreen) {
+        timber("FullScreenIcon", "editorScreenState=$editorScreenState")
+    }
 
     MainScreenContent(
         modifier = modifier,
-        uiState = uiState,
+        imageBmp = uiState.imageBmp,
+        selectedMaterial = uiState.selectedMaterial,
+        materials = uiState.materials,
+        overlays = uiState.overlays,
+        polygonPoints = uiState.polygonPoints,
+        currentOverlay = uiState.currentOverlay,
+        isMaterialApplied = uiState.isMaterialApplied,
+        canUndo = uiState.canUndo,
+        canRedo = uiState.canRedo,
+        editorHasImage = uiState.editorHasImage,
         loadingApplyMaterial = loadingApplyMaterial,
         currentCursor = currentCursor,
         perspectiveSwitchValue = perspectiveSwitchValue,
-        isEditorInFullScreen = isEditorFullScreen,
-        editorSize = editorSize,
+        editorScreenState = editorScreenState,
         onUiEvent = viewModel::onUiEvent
     )
 }
@@ -77,12 +91,20 @@ fun MainScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun MainScreenContent(
     modifier: Modifier,
-    uiState: MainUiState,
+    imageBmp: ImageBitmap?,
+    selectedMaterial: Int?,
+    materials: List<Int>,
+    overlays: List<OverlayMaterialModel>,
+    polygonPoints: List<Offset>,
+    currentOverlay: OverlayMaterialModel?,
+    isMaterialApplied: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    editorHasImage: Boolean,
     loadingApplyMaterial: Boolean,
     currentCursor: CursorData,
     perspectiveSwitchValue: Boolean,
-    isEditorInFullScreen: Boolean,
-    editorSize: IntSize,
+    editorScreenState: EditorScreenState,
     onUiEvent: (MainUiEvent) -> Unit
 ) {
     var imageSelectingPurpose by remember { mutableStateOf(ImageSelectingPurpose.EDITING_IMAGE) }
@@ -90,28 +112,25 @@ private fun MainScreenContent(
 //    var isEditorInFullScreen by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    val isPrimaryButtonEnabled by remember(
-        uiState.selectedMaterial,
-        uiState.imageBmp,
-        uiState.polygonPoints
-    ) {
+    val isPrimaryButtonEnabled by remember(selectedMaterial, imageBmp, polygonPoints) {
         derivedStateOf {
-            uiState.selectedMaterial != null && uiState.imageBmp != null && uiState.polygonPoints.canMakeClosedShape()
+            selectedMaterial != null && imageBmp != null && polygonPoints.canMakeClosedShape()
         }
     }
+
     val primaryButtonText by remember(
-        uiState.materials,
-        uiState.selectedMaterial,
-        uiState.polygonPoints,
-        uiState.isMaterialApplied
+        materials,
+        selectedMaterial,
+        polygonPoints,
+        isMaterialApplied
     ) {
         derivedStateOf {
             context.getString(
                 when {
-                    uiState.materials.isEmpty() -> R.string.loading_materials
-                    uiState.selectedMaterial == null -> R.string.select_material
-                    !uiState.polygonPoints.canMakeClosedShape() -> R.string.select_region
-                    uiState.isMaterialApplied -> R.string.material_applied
+                    materials.isEmpty() -> R.string.loading_materials
+                    selectedMaterial == null -> R.string.select_material
+                    !polygonPoints.canMakeClosedShape() -> R.string.select_region
+                    isMaterialApplied -> R.string.material_applied
                     else -> R.string.apply_material
                 }
             )
@@ -119,19 +138,19 @@ private fun MainScreenContent(
     }
 
     val primaryButtonContainerColor by remember(
-        uiState.isMaterialApplied,
-        uiState.polygonPoints.size
+        isMaterialApplied,
+        polygonPoints.size
     ) {
         derivedStateOf {
-            if (uiState.isMaterialApplied && uiState.polygonPoints.canMakeClosedShape()) SelectedItemColor else ButtonColor
+            if (isMaterialApplied && polygonPoints.canMakeClosedShape()) SelectedItemColor else ButtonColor
         }
     }
 
-    val primaryButton: @Composable (Modifier) -> Unit = remember(
+    /*val primaryButton: @Composable (Modifier) -> Unit = remember(
         primaryButtonText,
         isPrimaryButtonEnabled,
-        uiState.materials.isEmpty(),
-        uiState.selectedMaterial != null,
+        materials.isEmpty(),
+        selectedMaterial != null,
         primaryButtonContainerColor
     ) {
         @Composable { modifier ->
@@ -139,7 +158,7 @@ private fun MainScreenContent(
                 modifier = modifier,
                 primaryButtonText = primaryButtonText,
                 isPrimaryButtonEnabled = isPrimaryButtonEnabled,
-                isMaterialsEmpty = uiState.materials.isEmpty(),
+                isMaterialsEmpty = materials.isEmpty(),
                 containerColor = primaryButtonContainerColor,
                 onClick = { onUiEvent(MainUiEvent.ApplyMaterial) }
             )
@@ -147,15 +166,15 @@ private fun MainScreenContent(
     }
 
     val materialsMenuContent: @Composable (Modifier) -> Unit = remember(
-        uiState.materials,
-        uiState.selectedMaterial,
+        materials,
+        selectedMaterial,
         loadingApplyMaterial
     ) {
         @Composable { modifier ->
             MaterialsMenu(
                 modifier = modifier,
-                materials = uiState.materials,
-                selectedMaterial = uiState.selectedMaterial,
+                materials = materials,
+                selectedMaterial = selectedMaterial,
                 loadingApplyMaterial = loadingApplyMaterial,
                 onAddMaterial = {
                     imageSelectingPurpose = ImageSelectingPurpose.ADD_MATERIAL
@@ -169,23 +188,23 @@ private fun MainScreenContent(
     }
 
     val functionsMenu: @Composable (Modifier) -> Unit = remember(
-        uiState.canUndo,
-        uiState.canRedo,
-        uiState.imageBmp,
-        uiState.overlays,
-        uiState.polygonPoints.size,
-        uiState.currentOverlay,
+        canUndo,
+        canRedo,
+        imageBmp,
+        overlays,
+        polygonPoints.size,
+        currentOverlay,
         currentCursor
     ) {
         @Composable { modifier ->
             FunctionsMenu(
                 modifier = modifier,
-                canUndo = uiState.canUndo,
-                canRedo = uiState.canRedo,
-                baseImage = uiState.imageBmp,
-                overlays = uiState.overlays,
-                polygonPointsSize = uiState.polygonPoints.size,
-                selectedOverlay = uiState.currentOverlay,
+                canUndo = canUndo,
+                canRedo = canRedo,
+                baseImage = imageBmp,
+                overlays = overlays,
+                polygonPointsSize = polygonPoints.size,
+                selectedOverlay = currentOverlay,
                 selectedCursor = currentCursor,
                 onFunctionClicked = { function: FunctionData ->
                     if (function.type == FunctionsEnum.RESET_IMAGE) {
@@ -217,24 +236,24 @@ private fun MainScreenContent(
     }
 
     val imageSelector: @Composable (Modifier) -> Unit = remember(
-        uiState.imageBmp,
+        imageBmp,
         imageSelectingPurpose,
         showImagePickerDialog,
-        uiState.polygonPoints,
-        uiState.overlays,
-        editorSize,
+        polygonPoints,
+        overlays,
+        editorScreenState,
         currentCursor,
     ) {
         @Composable { modifier ->
             Box(modifier = modifier) {
                 ImageSelector(
-                    imageBmp = uiState.imageBmp,
+                    imageBmp = imageBmp,
                     purpose = imageSelectingPurpose,
                     showImagePicker = showImagePickerDialog,
-                    polygonPoints = uiState.polygonPoints,
-                    overlays = uiState.overlays,
+                    polygonPoints = polygonPoints,
+                    overlays = overlays,
                     currentCursor = currentCursor,
-                    editorSize = editorSize,
+                    editorSize = editorScreenState.size,
                     changeImagePickerVisibility = { value ->
                         imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
                         showImagePickerDialog = value
@@ -242,15 +261,33 @@ private fun MainScreenContent(
                     onMainUiEvent = onUiEvent
                 )
 
-                if (uiState.editorHasImage) {
+                if (editorHasImage) {
                     FullScreenIcon(
-                        isEditorInFullScreen,
+                        editorScreenState.isFullScreen,
                         modifier = Modifier.align(Alignment.TopEnd)
                     ) {
+                        timber("FullScreenIcon", "Clicked")
                         onUiEvent(MainUiEvent.ChangeEditorScreenSize)
                     }
                 }
             }
+        }
+    }*/
+
+    val rememberOnFunctionClicked = remember {
+        { function: FunctionData ->
+            if (function.type == FunctionsEnum.RESET_IMAGE) {
+                imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
+                showImagePickerDialog = true
+            } else {
+                onUiEvent(MainUiEvent.SelectFunction(function))
+            }
+        }
+    }
+
+    val rememberOnCursorClicked = remember {
+        { cursorData: CursorData ->
+            onUiEvent(MainUiEvent.SelectCursor(cursorData))
         }
     }
 
@@ -260,6 +297,20 @@ private fun MainScreenContent(
             .padding(8.dp)
             .animateContentSize()
     ) {
+        CursorsMenu(
+            modifier = Modifier
+                .fillMaxHeight()
+                .wrapContentWidth(),
+            canUndo = canUndo,
+            canRedo = canRedo,
+            baseImage = imageBmp,
+            overlays = overlays,
+            polygonPointsSize = polygonPoints.size,
+            selectedOverlay = currentOverlay,
+            selectedCursor = currentCursor,
+            onFunctionClicked = rememberOnFunctionClicked,
+            onCursorClicked = rememberOnCursorClicked
+        )
         Column(
             modifier = Modifier
                 .weight(10f)
@@ -267,7 +318,7 @@ private fun MainScreenContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            if (!isEditorInFullScreen) {
+            if (!editorScreenState.isFullScreen) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -275,23 +326,77 @@ private fun MainScreenContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    functionsMenu(
-                        Modifier
+//                    functionsMenu(
+//                        Modifier
+//                            .weight(1f)
+//                            .wrapContentHeight()
+//                    )
+                    FunctionsMenu(
+                        modifier = Modifier
                             .weight(1f)
-                            .wrapContentHeight()
+                            .wrapContentHeight(),
+                        canUndo = canUndo,
+                        canRedo = canRedo,
+                        baseImage = imageBmp,
+                        overlays = overlays,
+                        polygonPointsSize = polygonPoints.size,
+                        selectedOverlay = currentOverlay,
+                        selectedCursor = currentCursor,
+                        onFunctionClicked = rememberOnFunctionClicked,
+                        onCursorClicked = rememberOnCursorClicked
                     )
-                    perspectiveSwitch()
+                    val rememberOnCheckedChange = remember {
+                        { value: Boolean ->
+                            onUiEvent(MainUiEvent.ChangePerspective(value))
+                        }
+                    }
+                    PerspectiveSwitch(
+                        modifier = Modifier.wrapContentWidth(),
+                        isChecked = perspectiveSwitchValue,
+                        onCheckedChange = rememberOnCheckedChange
+                    )
                 }
             }
-            imageSelector(
-                Modifier
+//            imageSelector(
+//                Modifier
+//                    .weight(1f)
+//                    .fillMaxWidth()
+//                    .padding(start = 8.dp, end = if (editorScreenState.isFullScreen) 8.dp else 0.dp)
+//            )
+            Box(
+                modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(start = 8.dp, end = if (isEditorInFullScreen) 8.dp else 0.dp)
-            )
+                    .padding(start = 8.dp, end = if (editorScreenState.isFullScreen) 8.dp else 0.dp)
+            ) {
+                ImageSelector(
+                    imageBmp = imageBmp,
+                    purpose = imageSelectingPurpose,
+                    showImagePicker = showImagePickerDialog,
+                    polygonPoints = polygonPoints,
+                    overlays = overlays,
+                    currentCursor = currentCursor,
+                    editorSize = editorScreenState.size,
+                    changeImagePickerVisibility = { value ->
+                        imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
+                        showImagePickerDialog = value
+                    },
+                    onMainUiEvent = onUiEvent
+                )
+
+                if (editorHasImage) {
+                    FullScreenIcon(
+                        editorScreenState.isFullScreen,
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        timber("FullScreenIcon", "Clicked")
+                        onUiEvent(MainUiEvent.ChangeEditorScreenSize)
+                    }
+                }
+            }
         }
 
-        if (!isEditorInFullScreen) {
+        if (!editorScreenState.isFullScreen) {
             Column(
                 modifier = Modifier
                     .weight(2f)
@@ -299,11 +404,33 @@ private fun MainScreenContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                primaryButton(Modifier.fillMaxWidth())
-                materialsMenuContent(
-                    Modifier
+                PrimaryButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    primaryButtonText = primaryButtonText,
+                    isPrimaryButtonEnabled = isPrimaryButtonEnabled,
+                    isMaterialsEmpty = materials.isEmpty(),
+                    containerColor = primaryButtonContainerColor,
+                    onClick = { onUiEvent(MainUiEvent.ApplyMaterial) }
+                )
+//                materialsMenuContent(
+//                    Modifier
+//                        .weight(2f)
+//                        .fillMaxHeight()
+//                )
+                MaterialsMenu(
+                    modifier = Modifier
                         .weight(2f)
-                        .fillMaxHeight()
+                        .fillMaxHeight(),
+                    materials = materials,
+                    selectedMaterial = selectedMaterial,
+                    loadingApplyMaterial = loadingApplyMaterial,
+                    onAddMaterial = {
+                        imageSelectingPurpose = ImageSelectingPurpose.ADD_MATERIAL
+                        showImagePickerDialog = true
+                    },
+                    onMaterialSelected = { selectedMaterial: Int ->
+                        onUiEvent(MainUiEvent.SelectMaterial(selectedMaterial))
+                    }
                 )
             }
         }
@@ -316,28 +443,30 @@ fun FullScreenIcon(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val image = remember(isEditorInFullScreen) {
+        if (isEditorInFullScreen)
+            R.drawable.ic_close_fullscreen
+        else
+            R.drawable.ic_open_in_full
+    }
+
     Icon(
-        imageVector =
-            ImageVector.vectorResource(
-                if (isEditorInFullScreen)
-                    R.drawable.ic_close_fullscreen
-                else
-                    R.drawable.ic_open_in_full
-            ),
+        imageVector = ImageVector.vectorResource(image),
         modifier = modifier
-            .padding(8.dp)
-            .clickable(onClick = onClick)
+            .padding(4.dp)
+            .clip(CircleShape)
             .drawBehind {
                 drawCircle(
                     if (isEditorInFullScreen)
                         SelectedItemColor
                     else
-                        Color.Gray.copy(0.1f)
+                        Color.Gray.copy(0.2f)
                 )
             }
+            .clickable(onClick = onClick)
             .padding(8.dp)
             .size(16.dp),
-        tint = if (isEditorInFullScreen) Color.White else Color.Gray,
+        tint = if (isEditorInFullScreen) Color.White else Color.White,
         contentDescription = null
     )
 }

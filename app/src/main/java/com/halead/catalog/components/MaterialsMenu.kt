@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.halead.catalog.R
+import com.halead.catalog.ui.theme.BorderThickness
 import com.halead.catalog.ui.theme.SelectedItemColor
 import com.halead.catalog.utils.getAspectRatioFromResource
 import com.halead.catalog.utils.noRippleClickable
@@ -43,9 +44,7 @@ fun MaterialsMenu(
     onMaterialSelected: (Int) -> Unit
 ) {
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.LightGray),
+        modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 8.dp)
     ) {
@@ -67,7 +66,7 @@ fun MenuItem(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val aspectRatio by remember {
+    val aspectRatio by remember(material) {
         derivedStateOf {
             getAspectRatioFromResource(material, context)
         }
@@ -78,12 +77,12 @@ fun MenuItem(
             .aspectRatio(aspectRatio)
             .border(
                 BorderStroke(
-                    4.dp,
+                    BorderThickness,
                     if (selectedMaterial == material) SelectedItemColor else Color.White
                 ), RoundedCornerShape(8.dp)
             )
             .noRippleClickable { onMaterialSelected(material) }
-            .padding(4.dp)
+            .padding(BorderThickness)
     ) {
         Image(
             modifier = Modifier.fillMaxSize(),
@@ -91,14 +90,18 @@ fun MenuItem(
             contentScale = ContentScale.Crop,
             contentDescription = null
         )
-        if (loadingApplyMaterial && selectedMaterial == material) {
-            ShimmerEffect(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Color.LightGray.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
+        if (
+            loadingApplyMaterial && selectedMaterial == material
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .background(
+                            Color.LightGray.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .shimmerEffect()
             )
         }
     }
@@ -110,8 +113,8 @@ private fun AddMenuItem(
 ) {
     Box(
         modifier = Modifier
-            .border(BorderStroke(4.dp, Color.White), RoundedCornerShape(8.dp))
-            .padding(4.dp)
+            .border(BorderStroke(BorderThickness, Color.White), RoundedCornerShape(8.dp))
+            .padding(BorderThickness)
             .background(Color.White.copy(0.2f))
             .height(100.dp)
             .clickable(onClick = onClick),

@@ -14,11 +14,6 @@ data class FunctionData(
 
 val functionsList = listOf(
     FunctionData(
-        img = R.drawable.ic_reset_image,
-        text = "Reset Image",
-        type = FunctionsEnum.RESET_IMAGE
-    ),
-    FunctionData(
         img = R.drawable.ic_undo,
         text = "Undo",
         type = FunctionsEnum.UNDO
@@ -62,5 +57,10 @@ val functionsList = listOf(
         img = R.drawable.ic_rotate_right,
         text = "Rotate Right",
         type = FunctionsEnum.ROTATE_RIGHT
-    )
+    ),
+    FunctionData(
+        img = R.drawable.ic_reset_image,
+        text = "Reset Image",
+        type = FunctionsEnum.RESET_IMAGE
+    ),
 )

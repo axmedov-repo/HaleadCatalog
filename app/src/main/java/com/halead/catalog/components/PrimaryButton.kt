@@ -2,10 +2,11 @@ package com.halead.catalog.components
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.halead.catalog.ui.theme.AppButtonSize
+import com.halead.catalog.ui.theme.BorderThickness
 
 @Composable
 fun PrimaryButton(
@@ -34,14 +36,15 @@ fun PrimaryButton(
     onClick: () -> Unit
 ) {
     Button(
+        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 12.dp),
         modifier = modifier
             .padding(8.dp)
             .fillMaxWidth()
             .wrapContentHeight()
-            .heightIn(min = AppButtonSize)
+            .height(AppButtonSize)
             .shadow(4.dp, RoundedCornerShape(8.dp))
-            .clip(shape = RoundedCornerShape(8.dp))
-            .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp)),
+            .border(BorderThickness, Color.White, shape = RoundedCornerShape(8.dp))
+            .clip(shape = RoundedCornerShape(8.dp)),
         shape = RoundedCornerShape(8.dp),
         enabled = isPrimaryButtonEnabled,
         onClick = onClick,
@@ -53,13 +56,17 @@ fun PrimaryButton(
         val textColor = if (isPrimaryButtonEnabled) Color.White else Color.White.copy(alpha = 0.4f)
 
         Row(
-            modifier = Modifier.wrapContentHeight(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             AutoSizeText(
-                modifier = Modifier.weight(1f),
-                maxTextSize = 14.sp,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                maxTextSize = 10.sp,
                 softWrap = false,
                 maxLines = 1,
                 text = primaryButtonText,
@@ -70,7 +77,7 @@ fun PrimaryButton(
                 Spacer(Modifier.width(4.dp))
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
+                    strokeWidth = BorderThickness,
                     color = Color.White.copy(alpha = 0.4f)
                 )
             }

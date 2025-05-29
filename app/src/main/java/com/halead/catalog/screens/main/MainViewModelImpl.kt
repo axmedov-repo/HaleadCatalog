@@ -63,6 +63,11 @@ import javax.inject.Inject
 private val WIDTH_DIFF_OF_EDITOR_FULL_SCREEN: Dp = 88.dp
 private val HEIGHT_DIFF_OF_EDITOR_FULL_SCREEN: Dp = 66.dp
 
+data class EditorScreenState(
+    val isFullScreen: Boolean = false,
+    val size: IntSize = IntSize.Zero
+)
+
 @HiltViewModel
 class MainViewModelImpl @Inject constructor(
     private val mainRepository: MainRepository,
@@ -73,94 +78,106 @@ class MainViewModelImpl @Inject constructor(
     override val mainUiState = MutableStateFlow(MainUiState())
     override val loadingApplyMaterialState = MutableStateFlow(false)
     override val currentCursorState = MutableStateFlow(DefaultCursorData)
+
+    //    override val isPerspectiveEnabled = MutableStateFlow<Boolean>(true)
     override val isPerspectiveEnabled: StateFlow<Boolean> = settings.perspectiveSwitchValue
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     private var isRecentActionSavingEnabled = true
     private var isUndoEnabled: Boolean = true
     private var isRedoEnabled: Boolean = true
 
-    override val isEditorFullScreen = MutableStateFlow(false)
+    override val editorScreenState = MutableStateFlow(EditorScreenState())
     private var fullScreenEditorSize: IntSize = IntSize.Zero
     private var normalEditorSize: IntSize = IntSize.Zero
     private var hasEditorSizeMeasured = false
-    override val editorSize = MutableStateFlow(normalEditorSize)
 
     init {
         viewModelScope.launch {
             getMaterials()
-            observeIsMaterialApplied()
-        }
-
-        viewModelScope.launch {
-            saveCurrentState()
+            launch {
+                observeIsMaterialApplied()
+            }
+            launch {
+                saveCurrentState()
+            }
         }
     }
 
     override fun onUiEvent(mainUiEvent: MainUiEvent) {
-        when (mainUiEvent) {
-            is MainUiEvent.AddMaterial -> addMaterial(bitmap = mainUiEvent.bitmap)
-            MainUiEvent.AllOverlaysDrawn -> allOverlaysDrawn()
-            MainUiEvent.ApplyMaterial -> applyMaterial()
-            is MainUiEvent.BringHistoryWork -> bringHistoryWork(workModel = mainUiEvent.workModel)
-            is MainUiEvent.ChangePerspective -> changePerspective(value = mainUiEvent.value)
-            MainUiEvent.ClearPolygonPoints -> clearPolygonPoints()
-            is MainUiEvent.ExtendPolygonPoints -> extendPolygonPoints(offset = mainUiEvent.offset)
-            is MainUiEvent.InsertPolygonPoint -> insertPolygonPoint(offset = mainUiEvent.offset)
-            MainUiEvent.MemorizeUpdatedPolygonPoints -> memorizeUpdatedPolygonPoints()
-            is MainUiEvent.SelectCursor -> selectCursor(cursorData = mainUiEvent.cursorData)
-            is MainUiEvent.SelectFunction -> selectFunction(function = mainUiEvent.function)
-            is MainUiEvent.SelectImage -> selectImage(bitmap = mainUiEvent.bitmap)
-            is MainUiEvent.SelectMaterial -> selectMaterial(material = mainUiEvent.material)
-            is MainUiEvent.SelectOverlay -> selectOverlay(overlay = mainUiEvent.overlay)
-            MainUiEvent.UnselectCurrentOverlay -> unselectCurrentOverlay()
-            is MainUiEvent.UpdateCurrentOverlayPosition -> updateCurrentOverlayPosition(
-                overlayIndex = mainUiEvent.overlayIndex,
-                dragAmount = mainUiEvent.dragAmount
-            )
+        viewModelScope.launch {
+            when (mainUiEvent) {
+                is MainUiEvent.AddMaterial -> addMaterial(bitmap = mainUiEvent.bitmap)
+                MainUiEvent.AllOverlaysDrawn -> allOverlaysDrawn()
+                MainUiEvent.ApplyMaterial -> applyMaterial()
+                is MainUiEvent.BringHistoryWork -> bringHistoryWork(workModel = mainUiEvent.workModel)
+                is MainUiEvent.ChangePerspective -> changePerspective(value = mainUiEvent.value)
+                MainUiEvent.ClearPolygonPoints -> clearPolygonPoints()
+                is MainUiEvent.ExtendPolygonPoints -> extendPolygonPoints(offset = mainUiEvent.offset)
+                is MainUiEvent.InsertPolygonPoint -> insertPolygonPoint(offset = mainUiEvent.offset)
+                MainUiEvent.MemorizeUpdatedPolygonPoints -> memorizeUpdatedPolygonPoints()
+                is MainUiEvent.SelectCursor -> selectCursor(cursorData = mainUiEvent.cursorData)
+                is MainUiEvent.SelectFunction -> selectFunction(function = mainUiEvent.function)
+                is MainUiEvent.SelectImage -> selectImage(bitmap = mainUiEvent.bitmap)
+                MainUiEvent.ResetCurrentImage -> resetImage()
+                is MainUiEvent.SelectMaterial -> selectMaterial(material = mainUiEvent.material)
+                is MainUiEvent.SelectOverlay -> selectOverlay(overlay = mainUiEvent.overlay)
+                MainUiEvent.UnselectCurrentOverlay -> unselectCurrentOverlay()
+                is MainUiEvent.UpdateCurrentOverlayPosition -> updateCurrentOverlayPosition(
+                    overlayIndex = mainUiEvent.overlayIndex,
+                    dragAmount = mainUiEvent.dragAmount
+                )
 
-            is MainUiEvent.UpdateCurrentOverlayTransform -> updateCurrentOverlayTransform(
-                zoomChange = mainUiEvent.zoomChange,
-                offsetChange = mainUiEvent.offsetChange,
-                rotationChange = mainUiEvent.rotationChange
-            )
+                is MainUiEvent.UpdateCurrentOverlayTransform -> updateCurrentOverlayTransform(
+                    zoomChange = mainUiEvent.zoomChange,
+                    offsetChange = mainUiEvent.offsetChange,
+                    rotationChange = mainUiEvent.rotationChange
+                )
 
-            is MainUiEvent.UpdatePolygonPoint -> updatePolygonPoint(
-                index = mainUiEvent.index,
-                offset = mainUiEvent.offset
-            )
+                is MainUiEvent.UpdatePolygonPoint -> updatePolygonPoint(
+                    index = mainUiEvent.index,
+                    offset = mainUiEvent.offset
+                )
 
-            is MainUiEvent.EditorSize -> {
-                if (!hasEditorSizeMeasured) {
-                    mainUiEvent.size.takeIf { it != normalEditorSize }?.let {
-                        normalEditorSize = it
-                        fullScreenEditorSize = IntSize(
-                            width = it.width + dpToPx(context, WIDTH_DIFF_OF_EDITOR_FULL_SCREEN.value),
-                            height = it.height + dpToPx(context, HEIGHT_DIFF_OF_EDITOR_FULL_SCREEN.value)
-                        )
-                        updateEditorSize()
+                is MainUiEvent.EditorSize -> {
+                    if (!hasEditorSizeMeasured) {
+                        timber("FullScreenIcon", "ViewModel:MainUiEvent.EditorSize")
+                        mainUiEvent.size.takeIf { it != normalEditorSize }?.let {
+                            normalEditorSize = it
+                            fullScreenEditorSize = IntSize(
+                                width = it.width + dpToPx(context, WIDTH_DIFF_OF_EDITOR_FULL_SCREEN.value),
+                                height = it.height + dpToPx(context, HEIGHT_DIFF_OF_EDITOR_FULL_SCREEN.value)
+                            )
+                            editorScreenState.update { current ->
+                                current.copy(
+                                    size = if (current.isFullScreen) fullScreenEditorSize else normalEditorSize
+                                )
+                            }
+                        }
+                        hasEditorSizeMeasured = true
                     }
-                    hasEditorSizeMeasured = true
+                }
+
+                MainUiEvent.ChangeEditorScreenSize -> {
+                    timber("FullScreenIcon", "ViewModel:MainUiEvent.ChangeEditorScreenSize")
+//                isEditorFullScreen.update { !it }
+//                updateEditorSize()
+                    editorScreenState.update { current ->
+                        val newIsFullScreen = !current.isFullScreen
+                        timber("FullScreenIcon", "Updating isFullScreen to $newIsFullScreen")
+                        current.copy(
+                            isFullScreen = newIsFullScreen,
+                            size = if (newIsFullScreen) fullScreenEditorSize else normalEditorSize
+                        )
+                    }
                 }
             }
-
-            MainUiEvent.ChangeEditorScreenSize -> {
-                isEditorFullScreen.update { !it }
-                updateEditorSize()
-            }
         }
     }
 
-    private fun updateEditorSize() {
-        editorSize.update {
-            if (isEditorFullScreen.value) fullScreenEditorSize else normalEditorSize
-        }
-    }
-
-    private fun changePerspective(value: Boolean) {
-        viewModelScope.launch {
-            settings.changePerspective(value)
-        }
+    private suspend fun changePerspective(value: Boolean) = coroutineScope {
+//        isPerspectiveEnabled.value = value
+        settings.changePerspective(value)
     }
 
     private suspend fun observeIsMaterialApplied() {
@@ -177,7 +194,9 @@ class MainViewModelImpl @Inject constructor(
     private fun isMaterialApplied(): Boolean {
         val overlayPoints = mainUiState.value.currentOverlay?.polygonPoints ?: return false
         @Suppress("ConvertArgumentToSet")
-        return if (overlayPoints.isEmpty() || (mainUiState.value.polygonPoints.minus(overlayPoints).isNotEmpty())) {
+        return if (overlayPoints.isEmpty() || (mainUiState.value.polygonPoints.minus(overlayPoints)
+                .isNotEmpty())
+        ) {
             false
         } else {
             mainUiState.value.currentOverlay?.material == mainUiState.value.selectedMaterial &&
@@ -216,10 +235,9 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
-    private fun getMaterials() {
+    private suspend fun getMaterials() = coroutineScope {
         mainRepository.getMaterials().onEach { response ->
             response.onSuccess { result ->
-                timber("Materials", "getMaterials()=$result")
                 mainUiState.update {
                     it.copy(materials = result)
                 }
@@ -250,6 +268,16 @@ class MainViewModelImpl @Inject constructor(
                 )
             }
             currentCursorState.update { DefaultCursorData }
+        }
+    }
+
+    private fun resetImage() {
+        mainUiState.update {
+            it.copy(
+                overlays = emptyList(),
+                polygonPoints = emptyList(),
+                currentOverlay = null
+            )
         }
     }
 

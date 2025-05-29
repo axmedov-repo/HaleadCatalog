@@ -6,37 +6,24 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 @Composable
-fun ShimmerEffect(
-    modifier: Modifier,
+fun Modifier.shimmerEffect(
     widthOfShadowBrush: Int = 500,
     angleOfAxisY: Float = 270f,
     durationMillis: Int = 1000,
-) {
-
-
-    val shimmerColors = listOf(
-        Color.White.copy(alpha = 0.3f),
-        Color.White.copy(alpha = 0.5f),
-        Color.White.copy(alpha = 1.0f),
-        Color.White.copy(alpha = 0.5f),
-        Color.White.copy(alpha = 0.3f),
-    )
-
-    val transition = rememberInfiniteTransition(label = "")
-
-    val translateAnimation = transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (durationMillis + widthOfShadowBrush).toFloat(),
+    shimmerColors: List<Color> = defaultShimmerColors()
+): Modifier {
+    val infiniteTransition = rememberInfiniteTransition()
+    val translateAnimation = infiniteTransition.animateFloat(
+        initialValue = -widthOfShadowBrush.toFloat(),
+        targetValue = durationMillis.toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(
                 durationMillis = durationMillis,
@@ -44,22 +31,25 @@ fun ShimmerEffect(
             ),
             repeatMode = RepeatMode.Restart,
         ),
-        label = "Shimmer loading animation",
+        label = "ShimmerAnimation"
     )
 
-    val brush = Brush.linearGradient(
-        colors = shimmerColors,
-        start = Offset(x = translateAnimation.value - widthOfShadowBrush, y = 0.0f),
-        end = Offset(x = translateAnimation.value, y = angleOfAxisY),
-    )
-
-    Box(
-        modifier = modifier
-    ) {
-        Spacer(
-            modifier = Modifier
-                .matchParentSize()
-                .background(brush)
+    return drawBehind {
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = shimmerColors,
+                start = Offset(x = translateAnimation.value, y = 0f),
+                end = Offset(x = translateAnimation.value + widthOfShadowBrush, y = angleOfAxisY),
+            )
         )
     }
 }
+
+@Composable
+private fun defaultShimmerColors(): List<Color> = listOf(
+    Color.White.copy(alpha = 0.3f),
+    Color.White.copy(alpha = 0.5f),
+    Color.White.copy(alpha = 1.0f),
+    Color.White.copy(alpha = 0.5f),
+    Color.White.copy(alpha = 0.3f),
+)

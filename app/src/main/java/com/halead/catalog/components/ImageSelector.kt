@@ -33,7 +33,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
@@ -48,6 +47,7 @@ import com.halead.catalog.data.enums.ImageSelectingPurpose
 import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.ui.events.MainUiEvent
 import com.halead.catalog.ui.theme.AppButtonSize
+import com.halead.catalog.ui.theme.BorderThickness
 import com.halead.catalog.ui.theme.ButtonColor
 import com.halead.catalog.utils.canMakeClosedShape
 import com.halead.catalog.utils.createImageFile
@@ -163,7 +163,10 @@ fun ImageSelector(
             showDialog = showImagePicker,
             hasCurrentImage = imageBmp != null,
             onResetCurrentImage = {
-                launchersResult = imageBmp?.asAndroidBitmap()?.let { Bitmap.createBitmap(it) }
+                timber("calling", "OnResetImage")
+//                launchersResult = null
+//                launchersResult = imageBmp?.asAndroidBitmap()?.let { Bitmap.createBitmap(it) }
+                onMainUiEvent(MainUiEvent.ResetCurrentImage)
                 changeImagePickerVisibility(false)
             },
             onDismiss = {
@@ -219,8 +222,8 @@ private fun BrowseOrCaptureImageButton(
         modifier = modifier
             .height(AppButtonSize)
             .shadow(4.dp, RoundedCornerShape(8.dp))
-            .border(2.dp, Color.White, shape = RoundedCornerShape(8.dp))
-            .padding(2.dp),
+            .border(BorderThickness, Color.White, shape = RoundedCornerShape(8.dp))
+            .padding(BorderThickness),
         shape = RoundedCornerShape(6.dp),
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(containerColor = ButtonColor)
