@@ -5,7 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.FunctionData
-import com.halead.catalog.data.models.OverlayMaterialModel
+import com.halead.catalog.data.models.OverlayData
 import com.halead.catalog.data.models.WorkModel
 
 sealed class MainUiEvent {
@@ -15,7 +15,7 @@ sealed class MainUiEvent {
     data class SelectImage(val bitmap: Bitmap?) : MainUiEvent()
     data class SelectFunction(val function: FunctionData) : MainUiEvent()
     data class SelectCursor(val cursorData: CursorData) : MainUiEvent()
-    data class SelectOverlay(val overlay: OverlayMaterialModel) : MainUiEvent()
+    data class SelectOverlay(val overlay: OverlayData) : MainUiEvent()
     data object UnselectCurrentOverlay : MainUiEvent()
     data object ApplyMaterial : MainUiEvent()
     data object AllOverlaysDrawn : MainUiEvent()
@@ -26,12 +26,16 @@ sealed class MainUiEvent {
     data class UpdateCurrentOverlayPosition(val overlayIndex: Int?, val dragAmount: Offset) : MainUiEvent()
     data object ClearPolygonPoints : MainUiEvent()
     data class BringHistoryWork(val workModel: WorkModel) : MainUiEvent()
-    data class EditorSize(val size: IntSize) : MainUiEvent()
-    data object ChangeEditorScreenSize : MainUiEvent()
+    data class SaveEditorSize(val size: IntSize) : MainUiEvent()
+    data class SaveEditorFullSize(val size: IntSize) : MainUiEvent()
+    data class SaveHeightDiffOfFullScreen(val height: Int) : MainUiEvent()
+    data class SaveWidthDiffOfFullScreen(val width: Int) : MainUiEvent()
+    data object OnFullScreenChanged : MainUiEvent()
     data class UpdateCurrentOverlayTransform(
         val zoomChange: Float,
         val offsetChange: Offset,
         val rotationChange: Float
     ) : MainUiEvent()
+
     data object ResetCurrentImage : MainUiEvent()
 }

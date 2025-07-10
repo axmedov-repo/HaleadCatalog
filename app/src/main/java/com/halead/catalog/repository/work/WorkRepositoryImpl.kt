@@ -1,18 +1,10 @@
 package com.halead.catalog.repository.work
 
 import android.content.Context
-import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.data.models.WorkModel
-import com.halead.catalog.data.room.OverlayMaterialRoomEntity
 import com.halead.catalog.data.room.WorkDatabase
-import com.halead.catalog.data.room.WorkRoomEntity
-import com.halead.catalog.utils.loadImageFromFile
-import com.halead.catalog.utils.saveImageToFile
-import com.halead.catalog.utils.timber
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class WorkRepositoryImpl @Inject constructor(

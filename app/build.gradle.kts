@@ -66,6 +66,9 @@ dependencies {
     // glide
     implementation(libs.glide)
 
+    // coil
+    implementation(libs.coil.compose.v320)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
@@ -93,4 +96,8 @@ dependencies {
     // Data Store Preferences
     implementation(libs.androidx.datastore.preferences)
 
+    // Adaptive Layout
+    implementation("androidx.compose.material3.adaptive:adaptive")
+    implementation("androidx.compose.material3.adaptive:adaptive-layout")
+    implementation("androidx.compose.material3.adaptive:adaptive-navigation")
 }

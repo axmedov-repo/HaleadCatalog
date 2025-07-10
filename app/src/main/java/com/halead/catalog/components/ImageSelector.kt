@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -24,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,27 +46,30 @@ import com.halead.catalog.BuildConfig
 import com.halead.catalog.R
 import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.ImageSelectingPurpose
-import com.halead.catalog.data.models.OverlayMaterialModel
+import com.halead.catalog.data.models.OverlayData
 import com.halead.catalog.ui.events.MainUiEvent
 import com.halead.catalog.ui.theme.AppButtonSize
 import com.halead.catalog.ui.theme.BorderThickness
 import com.halead.catalog.ui.theme.ButtonColor
 import com.halead.catalog.utils.canMakeClosedShape
 import com.halead.catalog.utils.createImageFile
-import com.halead.catalog.utils.getBitmapFromUri
+import com.halead.catalog.utils.rememberCameraLauncher
+import com.halead.catalog.utils.rememberGalleryLauncher
 import com.halead.catalog.utils.showToast
 import com.halead.catalog.utils.timber
+import com.halead.catalog.utils.toDpSize
+import kotlinx.collections.immutable.ImmutableList
 
 @Composable
 fun ImageSelector(
     imageBmp: ImageBitmap?,
     purpose: ImageSelectingPurpose,
-    overlays: List<OverlayMaterialModel>,
-    polygonPoints: List<Offset>,
+    overlays: ImmutableList<OverlayData>,
+    polygonPoints: () -> ImmutableList<Offset>,
     modifier: Modifier = Modifier,
     showImagePicker: Boolean = false,
     currentCursor: CursorData,
-    editorSize: IntSize,
+    editorSize: () -> IntSize,
     changeImagePickerVisibility: (Boolean) -> Unit,
     onMainUiEvent: (MainUiEvent) -> Unit
 ) {
@@ -74,6 +79,18 @@ fun ImageSelector(
     var launchersResult by remember { mutableStateOf<Bitmap?>(null) }
     var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
+    LaunchedEffect(overlays) {
+        timber("OverlaysLog", "Selector 1: $overlays")
+    }
+
+    val purposeUpdatedState by rememberUpdatedState(purpose)
+    val polygonPointsUpdatedState = rememberUpdatedState(polygonPoints)
+    val overlaysUpdatedState by rememberUpdatedState(overlays)
+
+    LaunchedEffect(overlaysUpdatedState) {
+        timber("OverlaysLog", "Selector 2: $overlaysUpdatedState")
+    }
+
     LaunchedEffect(Unit) {
         hasCameraPermission = ContextCompat.checkSelfPermission(
             context,
@@ -81,11 +98,11 @@ fun ImageSelector(
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    LaunchedEffect(launchersResult, purpose) {
+    LaunchedEffect(launchersResult) {
         if (launchersResult != null) {
-            when (purpose) {
+            when (purposeUpdatedState) {
                 ImageSelectingPurpose.EDITING_IMAGE -> {
-                    if (polygonPoints.canMakeClosedShape() || overlays.isNotEmpty()) {
+                    if (polygonPointsUpdatedState.value().canMakeClosedShape() || overlaysUpdatedState.isNotEmpty()) {
                         showConfirmationDialog = true
                     } else {
                         onMainUiEvent(MainUiEvent.SelectImage(launchersResult))
@@ -148,16 +165,20 @@ fun ImageSelector(
             if (imageBmp == null) {
                 BrowseOrCaptureImageButton { changeImagePickerVisibility(true) }
             } else {
-                ImageEditor(
-                    imageBitmap = imageBmp,
-                    overlays = overlays,
-                    currentCursor = currentCursor,
-                    polygonPoints = polygonPoints,
-                    editorSize = editorSize,
-                    onMainUiEvent = onMainUiEvent
-                )
+                imageBmp.let { bmp ->
+                    ImageEditor(
+                        imageBitmap = { bmp },
+                        overlays = { overlaysUpdatedState },
+                        currentCursor = { currentCursor },
+                        polygonPoints = polygonPoints,
+                        editorSize = editorSize,
+                        onMainUiEvent = onMainUiEvent
+                    )
+                }
             }
         }
+
+//        Box(Modifier.size(editorSize().toDpSize()).background(Color.Cyan.copy(0.5f)))
 
         ImagePickerDialog(
             showDialog = showImagePicker,
@@ -187,6 +208,23 @@ fun ImageSelector(
             }
         )
 
+        val onConfirm = remember(launchersResult, purposeUpdatedState) {
+            {
+                launchersResult?.let {
+                    when (purposeUpdatedState) {
+                        ImageSelectingPurpose.EDITING_IMAGE -> {
+                            onMainUiEvent(MainUiEvent.SelectImage(launchersResult))
+                        }
+
+                        ImageSelectingPurpose.ADD_MATERIAL -> {
+                            onMainUiEvent(MainUiEvent.AddMaterial(launchersResult))
+                        }
+                    }
+                }
+                showConfirmationDialog = false
+            }
+        }
+
         if (showConfirmationDialog) {
             ConfirmationDialog(
                 title = stringResource(R.string.upload_new_image_question),
@@ -194,20 +232,7 @@ fun ImageSelector(
                 dismissButtonEnabled = true,
                 colors = ConfirmationDialogDefaults.colors(confirmButtonColor = ButtonColor),
                 onDismiss = { showConfirmationDialog = false },
-                onConfirm = {
-                    launchersResult?.let {
-                        when (purpose) {
-                            ImageSelectingPurpose.EDITING_IMAGE -> {
-                                onMainUiEvent(MainUiEvent.SelectImage(launchersResult))
-                            }
-
-                            ImageSelectingPurpose.ADD_MATERIAL -> {
-                                onMainUiEvent(MainUiEvent.AddMaterial(launchersResult))
-                            }
-                        }
-                    }
-                    showConfirmationDialog = false
-                }
+                onConfirm = onConfirm
             )
         }
     }
@@ -234,65 +259,4 @@ private fun BrowseOrCaptureImageButton(
             color = Color.White
         )
     }
-}
-
-@Composable
-private fun rememberCameraLauncher(
-    imageUri: Uri?,
-    context: Context,
-    onResult: (Bitmap) -> Unit
-) =
-    /*    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
-            launchersResult = bitmap
-        }*/
-    rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture(),
-        onResult = { success ->
-            if (success) {
-                try {
-                    imageUri?.let { uri ->
-                        timber("ImageSelector", "Camera capture successful, processing URI: $uri")
-                        val bitmap = getBitmapFromUri(context, uri)
-
-                        if (bitmap != null) {
-                            timber("ImageSelector", "Successfully converted URI to bitmap")
-                            onResult(bitmap)
-
-                            // Save bitmap if need
-                            /*CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    val outputDir =
-                                        context.getExternalFilesDir("Pictures") ?: context.filesDir
-                                    val outputFile =
-                                        File(outputDir, "capture_${System.currentTimeMillis()}.bmp")
-
-                                    BufferedOutputStream(FileOutputStream(outputFile)).use { out ->
-                                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-
-                                    }
-                                } catch (e: IOException) {
-                                    timberE("Error saving bitmap")
-                                }
-                            }*/
-                        } else {
-                            showToast(context, "Failed to process captured image")
-                        }
-                    } ?: run {
-                        showToast(context, "Failed to capture image: missing URI")
-                    }
-                } catch (e: Exception) {
-                    showToast(context, "Error processing captured image")
-                }
-            } else {
-                showToast(context, "Image capture cancelled")
-            }
-        }
-    )
-
-@Composable
-private fun rememberGalleryLauncher(
-    context: Context,
-    onResult: (Bitmap?) -> Unit
-) = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { galleryUri ->
-    onResult(getBitmapFromUri(context, galleryUri))
 }

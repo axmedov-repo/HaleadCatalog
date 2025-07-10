@@ -28,11 +28,11 @@ import com.halead.catalog.ui.theme.BorderThickness
 
 @Composable
 fun PrimaryButton(
-    primaryButtonText: String,
-    isPrimaryButtonEnabled: Boolean,
-    isMaterialsEmpty: Boolean,
+    primaryButtonText: () -> String,
+    isPrimaryButtonEnabled: () -> Boolean,
+    isMaterialsEmpty: () -> Boolean,
     modifier: Modifier = Modifier,
-    containerColor: Color = Color.Gray,
+    containerColor: () -> Color = { Color.Gray },
     onClick: () -> Unit
 ) {
     Button(
@@ -46,15 +46,13 @@ fun PrimaryButton(
             .border(BorderThickness, Color.White, shape = RoundedCornerShape(8.dp))
             .clip(shape = RoundedCornerShape(8.dp)),
         shape = RoundedCornerShape(8.dp),
-        enabled = isPrimaryButtonEnabled,
+        enabled = isPrimaryButtonEnabled(),
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(
-            containerColor = containerColor,
+            containerColor = containerColor(),
             disabledContainerColor = Color.Gray
         )
     ) {
-        val textColor = if (isPrimaryButtonEnabled) Color.White else Color.White.copy(alpha = 0.4f)
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -69,11 +67,11 @@ fun PrimaryButton(
                 maxTextSize = 10.sp,
                 softWrap = false,
                 maxLines = 1,
-                text = primaryButtonText,
-                color = textColor,
+                text = primaryButtonText(),
+                color = if (isPrimaryButtonEnabled()) Color.White else Color.White.copy(alpha = 0.4f),
                 alignment = Alignment.Center
             )
-            if (isMaterialsEmpty) {
+            if (isMaterialsEmpty()) {
                 Spacer(Modifier.width(4.dp))
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),

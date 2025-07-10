@@ -19,13 +19,13 @@ import com.halead.catalog.ui.theme.SelectedItemColor
 
 @Composable
 fun PerspectiveSwitch(
-    isChecked: Boolean,
+    isChecked: () -> Boolean,
     modifier: Modifier = Modifier,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Switch(
         modifier = modifier,
-        checked = isChecked,
+        checked = isChecked(),
         onCheckedChange = onCheckedChange,
         colors = SwitchDefaults.colors(
             checkedThumbColor = SelectedItemColor,
@@ -53,7 +53,7 @@ private fun PerspectiveSwitchPreview() {
         mutableStateOf(false)
     }
     PerspectiveSwitch(
-        isChecked = checked,
+        isChecked = { checked },
         onCheckedChange = { checked = it }
     )
 }

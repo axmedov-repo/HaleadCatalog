@@ -1,6 +1,7 @@
 package com.halead.catalog.screens.main
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,12 +29,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.halead.catalog.R
@@ -47,232 +49,35 @@ import com.halead.catalog.data.enums.CursorData
 import com.halead.catalog.data.enums.FunctionData
 import com.halead.catalog.data.enums.FunctionsEnum
 import com.halead.catalog.data.enums.ImageSelectingPurpose
-import com.halead.catalog.data.models.OverlayMaterialModel
 import com.halead.catalog.ui.events.MainUiEvent
 import com.halead.catalog.ui.theme.ButtonColor
 import com.halead.catalog.ui.theme.SelectedItemColor
 import com.halead.catalog.utils.canMakeClosedShape
+import com.halead.catalog.utils.dpToPx
 import com.halead.catalog.utils.timber
 
 @Composable
-fun MainScreen(modifier: Modifier = Modifier) {
-    val viewModel: MainViewModel = viewModel<MainViewModelImpl>()
-
-    val uiState = viewModel.mainUiState.collectAsState().value
-    val loadingApplyMaterial by viewModel.loadingApplyMaterialState.collectAsState()
-    val currentCursor by viewModel.currentCursorState.collectAsState()
-    val perspectiveSwitchValue by viewModel.isPerspectiveEnabled.collectAsState()
+fun MainScreen(
+    modifier: Modifier = Modifier,
+    viewModel: MainViewModel = viewModel<MainViewModelImpl>()
+) {
+    val uiState by viewModel.mainUiState.collectAsState()
+    val loadingApplyMaterialState by viewModel.loadingApplyMaterialState.collectAsState()
+    val currentCursorState by viewModel.currentCursorState.collectAsState()
+    val perspectiveSwitchValueState by viewModel.isPerspectiveEnabled.collectAsState()
     val editorScreenState by viewModel.editorScreenState.collectAsState()
+
+    LaunchedEffect(uiState.overlays) {
+        timber("OverlaysLog", "${uiState.overlays}")
+    }
 
     LaunchedEffect(editorScreenState.isFullScreen) {
         timber("FullScreenIcon", "editorScreenState=$editorScreenState")
     }
 
-    MainScreenContent(
-        modifier = modifier,
-        imageBmp = uiState.imageBmp,
-        selectedMaterial = uiState.selectedMaterial,
-        materials = uiState.materials,
-        overlays = uiState.overlays,
-        polygonPoints = uiState.polygonPoints,
-        currentOverlay = uiState.currentOverlay,
-        isMaterialApplied = uiState.isMaterialApplied,
-        canUndo = uiState.canUndo,
-        canRedo = uiState.canRedo,
-        editorHasImage = uiState.editorHasImage,
-        loadingApplyMaterial = loadingApplyMaterial,
-        currentCursor = currentCursor,
-        perspectiveSwitchValue = perspectiveSwitchValue,
-        editorScreenState = editorScreenState,
-        onUiEvent = viewModel::onUiEvent
-    )
-}
-
-@Composable
-private fun MainScreenContent(
-    modifier: Modifier,
-    imageBmp: ImageBitmap?,
-    selectedMaterial: Int?,
-    materials: List<Int>,
-    overlays: List<OverlayMaterialModel>,
-    polygonPoints: List<Offset>,
-    currentOverlay: OverlayMaterialModel?,
-    isMaterialApplied: Boolean,
-    canUndo: Boolean,
-    canRedo: Boolean,
-    editorHasImage: Boolean,
-    loadingApplyMaterial: Boolean,
-    currentCursor: CursorData,
-    perspectiveSwitchValue: Boolean,
-    editorScreenState: EditorScreenState,
-    onUiEvent: (MainUiEvent) -> Unit
-) {
+    val context = LocalContext.current
     var imageSelectingPurpose by remember { mutableStateOf(ImageSelectingPurpose.EDITING_IMAGE) }
     var showImagePickerDialog by rememberSaveable { mutableStateOf(false) }
-//    var isEditorInFullScreen by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-
-    val isPrimaryButtonEnabled by remember(selectedMaterial, imageBmp, polygonPoints) {
-        derivedStateOf {
-            selectedMaterial != null && imageBmp != null && polygonPoints.canMakeClosedShape()
-        }
-    }
-
-    val primaryButtonText by remember(
-        materials,
-        selectedMaterial,
-        polygonPoints,
-        isMaterialApplied
-    ) {
-        derivedStateOf {
-            context.getString(
-                when {
-                    materials.isEmpty() -> R.string.loading_materials
-                    selectedMaterial == null -> R.string.select_material
-                    !polygonPoints.canMakeClosedShape() -> R.string.select_region
-                    isMaterialApplied -> R.string.material_applied
-                    else -> R.string.apply_material
-                }
-            )
-        }
-    }
-
-    val primaryButtonContainerColor by remember(
-        isMaterialApplied,
-        polygonPoints.size
-    ) {
-        derivedStateOf {
-            if (isMaterialApplied && polygonPoints.canMakeClosedShape()) SelectedItemColor else ButtonColor
-        }
-    }
-
-    /*val primaryButton: @Composable (Modifier) -> Unit = remember(
-        primaryButtonText,
-        isPrimaryButtonEnabled,
-        materials.isEmpty(),
-        selectedMaterial != null,
-        primaryButtonContainerColor
-    ) {
-        @Composable { modifier ->
-            PrimaryButton(
-                modifier = modifier,
-                primaryButtonText = primaryButtonText,
-                isPrimaryButtonEnabled = isPrimaryButtonEnabled,
-                isMaterialsEmpty = materials.isEmpty(),
-                containerColor = primaryButtonContainerColor,
-                onClick = { onUiEvent(MainUiEvent.ApplyMaterial) }
-            )
-        }
-    }
-
-    val materialsMenuContent: @Composable (Modifier) -> Unit = remember(
-        materials,
-        selectedMaterial,
-        loadingApplyMaterial
-    ) {
-        @Composable { modifier ->
-            MaterialsMenu(
-                modifier = modifier,
-                materials = materials,
-                selectedMaterial = selectedMaterial,
-                loadingApplyMaterial = loadingApplyMaterial,
-                onAddMaterial = {
-                    imageSelectingPurpose = ImageSelectingPurpose.ADD_MATERIAL
-                    showImagePickerDialog = true
-                },
-                onMaterialSelected = { selectedMaterial: Int ->
-                    onUiEvent(MainUiEvent.SelectMaterial(selectedMaterial))
-                }
-            )
-        }
-    }
-
-    val functionsMenu: @Composable (Modifier) -> Unit = remember(
-        canUndo,
-        canRedo,
-        imageBmp,
-        overlays,
-        polygonPoints.size,
-        currentOverlay,
-        currentCursor
-    ) {
-        @Composable { modifier ->
-            FunctionsMenu(
-                modifier = modifier,
-                canUndo = canUndo,
-                canRedo = canRedo,
-                baseImage = imageBmp,
-                overlays = overlays,
-                polygonPointsSize = polygonPoints.size,
-                selectedOverlay = currentOverlay,
-                selectedCursor = currentCursor,
-                onFunctionClicked = { function: FunctionData ->
-                    if (function.type == FunctionsEnum.RESET_IMAGE) {
-                        imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
-                        showImagePickerDialog = true
-                    } else {
-                        onUiEvent(MainUiEvent.SelectFunction(function))
-                    }
-                },
-                onCursorClicked = { cursorData: CursorData ->
-                    onUiEvent(MainUiEvent.SelectCursor(cursorData))
-                }
-            )
-        }
-    }
-
-    val perspectiveSwitch: @Composable () -> Unit = remember(
-        perspectiveSwitchValue
-    ) {
-        @Composable {
-            PerspectiveSwitch(
-                modifier = Modifier.wrapContentWidth(),
-                isChecked = perspectiveSwitchValue,
-                onCheckedChange = { value ->
-                    onUiEvent(MainUiEvent.ChangePerspective(value))
-                }
-            )
-        }
-    }
-
-    val imageSelector: @Composable (Modifier) -> Unit = remember(
-        imageBmp,
-        imageSelectingPurpose,
-        showImagePickerDialog,
-        polygonPoints,
-        overlays,
-        editorScreenState,
-        currentCursor,
-    ) {
-        @Composable { modifier ->
-            Box(modifier = modifier) {
-                ImageSelector(
-                    imageBmp = imageBmp,
-                    purpose = imageSelectingPurpose,
-                    showImagePicker = showImagePickerDialog,
-                    polygonPoints = polygonPoints,
-                    overlays = overlays,
-                    currentCursor = currentCursor,
-                    editorSize = editorScreenState.size,
-                    changeImagePickerVisibility = { value ->
-                        imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
-                        showImagePickerDialog = value
-                    },
-                    onMainUiEvent = onUiEvent
-                )
-
-                if (editorHasImage) {
-                    FullScreenIcon(
-                        editorScreenState.isFullScreen,
-                        modifier = Modifier.align(Alignment.TopEnd)
-                    ) {
-                        timber("FullScreenIcon", "Clicked")
-                        onUiEvent(MainUiEvent.ChangeEditorScreenSize)
-                    }
-                }
-            }
-        }
-    }*/
 
     val rememberOnFunctionClicked = remember {
         { function: FunctionData ->
@@ -280,14 +85,14 @@ private fun MainScreenContent(
                 imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
                 showImagePickerDialog = true
             } else {
-                onUiEvent(MainUiEvent.SelectFunction(function))
+                viewModel.onUiEvent(MainUiEvent.SelectFunction(function))
             }
         }
     }
 
     val rememberOnCursorClicked = remember {
         { cursorData: CursorData ->
-            onUiEvent(MainUiEvent.SelectCursor(cursorData))
+            viewModel.onUiEvent(MainUiEvent.SelectCursor(cursorData))
         }
     }
 
@@ -301,144 +106,216 @@ private fun MainScreenContent(
             modifier = Modifier
                 .fillMaxHeight()
                 .wrapContentWidth(),
-            canUndo = canUndo,
-            canRedo = canRedo,
-            baseImage = imageBmp,
-            overlays = overlays,
-            polygonPointsSize = polygonPoints.size,
-            selectedOverlay = currentOverlay,
-            selectedCursor = currentCursor,
+            canUndo = uiState.canUndo,
+            canRedo = uiState.canRedo,
+            baseImage = uiState.imageBmp,
+            overlays = uiState.overlays,
+            polygonPointsSize = { uiState.polygonPoints.size },
+            selectedOverlay = uiState.currentOverlay,
+            selectedCursor = currentCursorState,
             onFunctionClicked = rememberOnFunctionClicked,
             onCursorClicked = rememberOnCursorClicked
         )
-        Column(
+
+        Row(
             modifier = Modifier
-                .weight(10f)
-                .fillMaxHeight(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .fillMaxSize()
+                .weight(1f)
+                .onSizeChanged {
+                    viewModel.onUiEvent(MainUiEvent.SaveEditorFullSize(it))
+                    timber("FullScreenIcon", "FullScreen size = ${it.width}, ${it.height}")
+                }
+//                .layout { measurable, constraints ->
+//                    val placeable = measurable.measure(constraints)
+//
+//                    viewModel.onUiEvent(MainUiEvent.SaveEditorFullSize(IntSize(placeable.width, placeable.height)))
+//                    timber("FullScreenIcon", "FullScreen size = ${placeable.width}, ${placeable.height}")
+//                    timber("FullScreenIcon", "FullScreen size - 32.dp, 16.dp= ${placeable.width - dpToPx(context, 32f)}, ${placeable.height - dpToPx(context, 16f)}")
+//
+//                    layout(placeable.width, placeable.height) {
+//                        placeable.place(0, 0)
+//                    }
+//                }
         ) {
-            if (!editorScreenState.isFullScreen) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-//                    functionsMenu(
-//                        Modifier
-//                            .weight(1f)
-//                            .wrapContentHeight()
-//                    )
-                    FunctionsMenu(
-                        modifier = Modifier
-                            .weight(1f)
-                            .wrapContentHeight(),
-                        canUndo = canUndo,
-                        canRedo = canRedo,
-                        baseImage = imageBmp,
-                        overlays = overlays,
-                        polygonPointsSize = polygonPoints.size,
-                        selectedOverlay = currentOverlay,
-                        selectedCursor = currentCursor,
-                        onFunctionClicked = rememberOnFunctionClicked,
-                        onCursorClicked = rememberOnCursorClicked
-                    )
-                    val rememberOnCheckedChange = remember {
-                        { value: Boolean ->
-                            onUiEvent(MainUiEvent.ChangePerspective(value))
-                        }
-                    }
-                    PerspectiveSwitch(
-                        modifier = Modifier.wrapContentWidth(),
-                        isChecked = perspectiveSwitchValue,
-                        onCheckedChange = rememberOnCheckedChange
-                    )
-                }
-            }
-//            imageSelector(
-//                Modifier
-//                    .weight(1f)
-//                    .fillMaxWidth()
-//                    .padding(start = 8.dp, end = if (editorScreenState.isFullScreen) 8.dp else 0.dp)
-//            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, end = if (editorScreenState.isFullScreen) 8.dp else 0.dp)
-            ) {
-                ImageSelector(
-                    imageBmp = imageBmp,
-                    purpose = imageSelectingPurpose,
-                    showImagePicker = showImagePickerDialog,
-                    polygonPoints = polygonPoints,
-                    overlays = overlays,
-                    currentCursor = currentCursor,
-                    editorSize = editorScreenState.size,
-                    changeImagePickerVisibility = { value ->
-                        imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
-                        showImagePickerDialog = value
-                    },
-                    onMainUiEvent = onUiEvent
-                )
-
-                if (editorHasImage) {
-                    FullScreenIcon(
-                        editorScreenState.isFullScreen,
-                        modifier = Modifier.align(Alignment.TopEnd)
-                    ) {
-                        timber("FullScreenIcon", "Clicked")
-                        onUiEvent(MainUiEvent.ChangeEditorScreenSize)
-                    }
-                }
-            }
-        }
-
-        if (!editorScreenState.isFullScreen) {
             Column(
                 modifier = Modifier
-                    .weight(2f)
+                    .weight(10f)
                     .fillMaxHeight(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                PrimaryButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    primaryButtonText = primaryButtonText,
-                    isPrimaryButtonEnabled = isPrimaryButtonEnabled,
-                    isMaterialsEmpty = materials.isEmpty(),
-                    containerColor = primaryButtonContainerColor,
-                    onClick = { onUiEvent(MainUiEvent.ApplyMaterial) }
-                )
-//                materialsMenuContent(
-//                    Modifier
-//                        .weight(2f)
-//                        .fillMaxHeight()
-//                )
-                MaterialsMenu(
+                if (!editorScreenState.isFullScreen) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                            .onSizeChanged {
+                                viewModel.onUiEvent(MainUiEvent.SaveHeightDiffOfFullScreen(it.height))
+                            },
+//                            .layout { measurable, constraints ->
+//                                val placeable = measurable.measure(constraints)
+//
+//                                viewModel.onUiEvent(MainUiEvent.SaveHeightDiffOfFullScreen(placeable.height))
+//
+//                                layout(placeable.width, placeable.height) {
+//                                    placeable.place(0, 0)
+//                                }
+//                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FunctionsMenu(
+                            modifier = Modifier
+                                .weight(1f)
+                                .wrapContentHeight(),
+                            canUndo = uiState.canUndo,
+                            canRedo = uiState.canRedo,
+                            baseImage = uiState.imageBmp,
+                            overlays = uiState.overlays,
+                            polygonPointsSize = { uiState.polygonPoints.size },
+                            selectedOverlay = uiState.currentOverlay,
+                            onFunctionClicked = rememberOnFunctionClicked,
+                        )
+                        val rememberOnCheckedChange = remember {
+                            { value: Boolean ->
+                                viewModel.onUiEvent(MainUiEvent.ChangePerspective(value))
+                            }
+                        }
+                        PerspectiveSwitch(
+                            modifier = Modifier.wrapContentWidth(),
+                            isChecked = { perspectiveSwitchValueState },
+                            onCheckedChange = rememberOnCheckedChange
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, end = if (editorScreenState.isFullScreen) 8.dp else 0.dp)
+                ) {
+                    val onChangeImagePickerValue = remember {
+                        { value: Boolean ->
+                            imageSelectingPurpose = ImageSelectingPurpose.EDITING_IMAGE
+                            showImagePickerDialog = value
+                        }
+                    }
+
+                    ImageSelector(
+                        imageBmp = uiState.imageBmp,
+                        purpose = imageSelectingPurpose,
+                        showImagePicker = showImagePickerDialog,
+                        polygonPoints = { uiState.polygonPoints },
+                        overlays = uiState.overlays,
+                        currentCursor = currentCursorState,
+                        editorSize = { editorScreenState.size },
+                        changeImagePickerVisibility = onChangeImagePickerValue,
+                        onMainUiEvent = viewModel::onUiEvent
+                    )
+
+                    if (uiState.editorHasImage) {
+                        val onClick = remember {
+                            {
+                                viewModel.onUiEvent(MainUiEvent.OnFullScreenChanged)
+                            }
+                        }
+                        FullScreenIcon(
+                            editorScreenState.isFullScreen,
+                            modifier = Modifier.align(Alignment.TopEnd),
+                            onClick = onClick
+                        )
+                    }
+                }
+            }
+
+            if (!editorScreenState.isFullScreen) {
+                Column(
                     modifier = Modifier
                         .weight(2f)
-                        .fillMaxHeight(),
-                    materials = materials,
-                    selectedMaterial = selectedMaterial,
-                    loadingApplyMaterial = loadingApplyMaterial,
-                    onAddMaterial = {
-                        imageSelectingPurpose = ImageSelectingPurpose.ADD_MATERIAL
-                        showImagePickerDialog = true
-                    },
-                    onMaterialSelected = { selectedMaterial: Int ->
-                        onUiEvent(MainUiEvent.SelectMaterial(selectedMaterial))
+                        .fillMaxHeight()
+                        .onSizeChanged {
+                            viewModel.onUiEvent(MainUiEvent.SaveWidthDiffOfFullScreen(it.width))
+                        },
+//                        .layout { measurable, constraints ->
+//                            val placeable = measurable.measure(constraints)
+//
+//                            viewModel.onUiEvent(MainUiEvent.SaveWidthDiffOfFullScreen(placeable.width))
+//
+//                            layout(placeable.width, placeable.height) {
+//                                placeable.place(0, 0)
+//                            }
+//                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    val isPrimaryButtonEnabled by remember {
+                        derivedStateOf {
+                            uiState.selectedMaterial != null && uiState.imageBmp != null && uiState.polygonPoints.canMakeClosedShape()
+                        }
                     }
-                )
+
+                    val primaryButtonTextResId by remember {
+                        derivedStateOf {
+                            when {
+                                uiState.materials.isEmpty() -> R.string.loading_materials
+                                uiState.selectedMaterial == null -> R.string.select_material
+                                !uiState.polygonPoints.canMakeClosedShape() -> R.string.select_region
+                                uiState.isMaterialApplied -> R.string.material_applied
+                                else -> R.string.apply_material
+                            }
+                        }
+                    }
+
+                    val primaryButtonContainerColor by remember {
+                        derivedStateOf {
+                            if (uiState.isMaterialApplied && uiState.polygonPoints.canMakeClosedShape()) SelectedItemColor else ButtonColor
+                        }
+                    }
+
+                    val rememberOnClick = remember {
+                        { viewModel.onUiEvent(MainUiEvent.ApplyMaterial) }
+                    }
+
+                    PrimaryButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        primaryButtonText = { context.getString(primaryButtonTextResId) },
+                        isPrimaryButtonEnabled = { isPrimaryButtonEnabled },
+                        isMaterialsEmpty = { uiState.materials.isEmpty() },
+                        containerColor = { primaryButtonContainerColor },
+                        onClick = rememberOnClick
+                    )
+
+                    val rememberOnAddMaterial = remember {
+                        {
+                            imageSelectingPurpose = ImageSelectingPurpose.ADD_MATERIAL
+                            showImagePickerDialog = true
+                        }
+                    }
+
+                    val rememberOnMaterialSelected = remember {
+                        { selectedMaterial: Int ->
+                            viewModel.onUiEvent(MainUiEvent.SelectMaterial(selectedMaterial))
+                        }
+                    }
+
+                    MaterialsMenu(
+                        modifier = Modifier
+                            .weight(2f)
+                            .fillMaxHeight(),
+                        materials = uiState.materials,
+                        selectedMaterial = uiState.selectedMaterial,
+                        loadingApplyMaterial = { loadingApplyMaterialState },
+                        onAddMaterial = rememberOnAddMaterial,
+                        onMaterialSelected = rememberOnMaterialSelected
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun FullScreenIcon(
+private fun FullScreenIcon(
     isEditorInFullScreen: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit

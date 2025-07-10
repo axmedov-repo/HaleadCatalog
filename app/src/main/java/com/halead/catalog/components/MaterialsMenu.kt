@@ -1,5 +1,6 @@
 package com.halead.catalog.components
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,7 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,17 +32,23 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import com.halead.catalog.R
+import com.halead.catalog.data.models.OverlayMaterial
 import com.halead.catalog.ui.theme.BorderThickness
 import com.halead.catalog.ui.theme.SelectedItemColor
 import com.halead.catalog.utils.getAspectRatioFromResource
 import com.halead.catalog.utils.noRippleClickable
+import kotlinx.collections.immutable.ImmutableList
+import kotlin.math.roundToInt
 
 @Composable
 fun MaterialsMenu(
-    materials: List<Int>,
-    selectedMaterial: Int?,
-    loadingApplyMaterial: Boolean,
+    materials: ImmutableList<Int>,
+    selectedMaterial: OverlayMaterial?,
+    loadingApplyMaterial: () -> Boolean,
     modifier: Modifier = Modifier,
     onAddMaterial: () -> Unit = {},
     onMaterialSelected: (Int) -> Unit
@@ -49,7 +59,12 @@ fun MaterialsMenu(
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 8.dp)
     ) {
         items(materials) { material ->
-            MenuItem(material, selectedMaterial, loadingApplyMaterial, onMaterialSelected)
+            MenuItem(
+                material = material,
+                isSelected = selectedMaterial?.resId == material,
+                loadingApplyMaterial = loadingApplyMaterial,
+                onMaterialSelected = onMaterialSelected
+            )
         }
         /*item {
             AddMenuItem { onAddMaterial() }
@@ -58,10 +73,10 @@ fun MaterialsMenu(
 }
 
 @Composable
-fun MenuItem(
-    material: Int,
-    selectedMaterial: Int?,
-    loadingApplyMaterial: Boolean,
+private fun MenuItem(
+    @DrawableRes material: Int,
+    isSelected: Boolean,
+    loadingApplyMaterial: () -> Boolean,
     onMaterialSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,6 +86,21 @@ fun MenuItem(
             getAspectRatioFromResource(material, context)
         }
     }
+    val width = 512
+    val height = (width / aspectRatio).roundToInt()
+    var isLoading by remember(material) {
+        mutableStateOf(false)
+    }
+
+    val painter = rememberAsyncImagePainter(
+        ImageRequest.Builder(context)
+            .data(material)
+            .size(width, height)
+            .build(),
+        onState = {
+            isLoading = it is AsyncImagePainter.State.Loading
+        }
+    )
 
     Box(
         modifier = modifier
@@ -78,7 +108,7 @@ fun MenuItem(
             .border(
                 BorderStroke(
                     BorderThickness,
-                    if (selectedMaterial == material) SelectedItemColor else Color.White
+                    if (isSelected) SelectedItemColor else Color.White
                 ), RoundedCornerShape(8.dp)
             )
             .noRippleClickable { onMaterialSelected(material) }
@@ -86,23 +116,12 @@ fun MenuItem(
     ) {
         Image(
             modifier = Modifier.fillMaxSize(),
-            painter = painterResource(material),
+            painter = painter,
             contentScale = ContentScale.Crop,
             contentDescription = null
         )
-        if (
-            loadingApplyMaterial && selectedMaterial == material
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .matchParentSize()
-                        .background(
-                            Color.LightGray.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .shimmerEffect()
-            )
+        if (isLoading || (loadingApplyMaterial() && isSelected)) {
+            ShimmerBox(modifier = Modifier.matchParentSize())
         }
     }
 }

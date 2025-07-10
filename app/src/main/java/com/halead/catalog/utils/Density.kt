@@ -29,6 +29,10 @@ fun Density.dpToIntPx(dp: Dp) = if (dp.isSpecified) dp.toPx().toInt() else 0
 
 fun Density.dpRoundToPx(dp: Dp) = if (dp.isSpecified) dp.roundToPx() else 0
 
+fun Dp.toPx(context: Context): Float {
+    return this.value * context.resources.displayMetrics.density
+}
+
 @Composable
 fun Dp.toSp() = LocalDensity.current.dpToSp(this)
 

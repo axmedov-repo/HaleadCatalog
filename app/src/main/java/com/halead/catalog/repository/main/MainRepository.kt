@@ -4,11 +4,11 @@ import android.graphics.Bitmap
 import kotlinx.coroutines.flow.Flow
 
 interface MainRepository {
-    fun getMaterials(): Flow<Result<List<Int>>>
+    suspend fun getMaterials(): Flow<Result<List<Int>>>
 
     /**
      * Not Implemented
      */
-    fun addMaterial(bitmap: Bitmap?)
-    fun getBitmap(imageResId: Int): Flow<Result<Bitmap?>>
+    suspend fun addMaterial(bitmap: Bitmap?)
+    suspend fun getBitmap(imageResId: Int): Bitmap?
 }

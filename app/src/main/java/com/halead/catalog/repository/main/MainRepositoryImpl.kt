@@ -12,7 +12,7 @@ class MainRepositoryImpl @Inject constructor(
     private val dataProvider: DataProvider,
     private val bitmapCacheManager: BitmapCacheManager
 ) : MainRepository {
-    override fun getMaterials(): Flow<Result<List<Int>>> = flow {
+    override suspend fun getMaterials(): Flow<Result<List<Int>>> = flow {
         timber("Materials", "repo getMaterials()")
         emit(
             Result.success(
@@ -24,14 +24,10 @@ class MainRepositoryImpl @Inject constructor(
     /**
      * Not Implemented
      */
-    override fun addMaterial(bitmap: Bitmap?) {}
+    override suspend fun addMaterial(bitmap: Bitmap?) {}
 
-    override fun getBitmap(imageResId: Int): Flow<Result<Bitmap?>> = flow {
+    override suspend fun getBitmap(imageResId: Int): Bitmap? {
         timber("Materials", "repo getBitmap() imageRes=$imageResId")
-        emit(
-            Result.success(
-                bitmapCacheManager.getBitmap(imageResId)
-            )
-        )
+        return bitmapCacheManager.getBitmap(imageResId)
     }
 }

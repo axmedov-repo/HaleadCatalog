@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -49,15 +50,19 @@ fun getRegionSize(regionPoints: List<Offset>): Size {
     return Size(width, height)
 }
 
+val aspectRatioCache = mutableMapOf<Int, Float>()
+
 fun getAspectRatioFromResource(resourceId: Int, context: Context): Float {
-    val options = BitmapFactory.Options().apply {
-        inJustDecodeBounds = true // Only decode the dimensions
-    }
-    BitmapFactory.decodeResource(context.resources, resourceId, options)
-    return if (options.outWidth > 0 && options.outHeight > 0) {
-        options.outWidth.toFloat() / options.outHeight.toFloat()
-    } else {
-        1f // Default aspect ratio if dimensions are invalid
+    return aspectRatioCache.getOrPut(resourceId) {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeResource(context.resources, resourceId, options)
+        if (options.outWidth > 0 && options.outHeight > 0) {
+            options.outWidth.toFloat() / options.outHeight.toFloat()
+        } else {
+            1f
+        }
     }
 }
 
@@ -78,6 +83,12 @@ fun <T> Stack<T>.peekOrNull(): T? {
 }
 
 fun Bitmap.isPanoramic(): Boolean {
+    val aspectRatio = this.width.toFloat() / this.height.toFloat()
+    timber("isPanoramic", "${aspectRatio > 2.0}")
+    return aspectRatio > 2.0  // Consider it panoramic if width is more than 2x height
+}
+
+fun ImageBitmap.isPanoramic(): Boolean {
     val aspectRatio = this.width.toFloat() / this.height.toFloat()
     timber("isPanoramic", "${aspectRatio > 2.0}")
     return aspectRatio > 2.0  // Consider it panoramic if width is more than 2x height

@@ -34,11 +34,12 @@ import com.halead.catalog.data.enums.FunctionData
 import com.halead.catalog.data.enums.FunctionsEnum
 import com.halead.catalog.data.enums.cursorTypesList
 import com.halead.catalog.data.enums.functionsList
-import com.halead.catalog.data.models.OverlayMaterialModel
+import com.halead.catalog.data.models.OverlayData
 import com.halead.catalog.ui.theme.AppButtonSize
 import com.halead.catalog.ui.theme.BorderThickness
 import com.halead.catalog.ui.theme.SelectedItemColor
 import com.halead.catalog.utils.noRippleClickable
+import kotlinx.collections.immutable.ImmutableList
 
 @Composable
 fun FunctionsMenu(
@@ -46,12 +47,10 @@ fun FunctionsMenu(
     canUndo: Boolean,
     canRedo: Boolean,
     baseImage: ImageBitmap?,
-    overlays: List<OverlayMaterialModel>,
-    polygonPointsSize: Int,
-    selectedOverlay: OverlayMaterialModel?,
-    selectedCursor: CursorData?,
+    overlays: ImmutableList<OverlayData>,
+    polygonPointsSize: () -> Int,
+    selectedOverlay: OverlayData?,
     onFunctionClicked: (FunctionData) -> Unit,
-    onCursorClicked: (CursorData) -> Unit,
 ) {
     val functions = remember {
         functionsList.filter { it.type !in listOf(FunctionsEnum.UNDO, FunctionsEnum.REDO) }
@@ -64,39 +63,44 @@ fun FunctionsMenu(
         modifier = modifier.fillMaxWidth()
     ) {
         items(
-            functions,
-            key = { it.type }) { functionData ->
+            items = functions,
+            key = { it.type }
+        ) { functionData ->
 
             val rememberFunctionClicked = remember(functionData) {
                 { onFunctionClicked(functionData) }
             }
 
+            val isEnabled by remember(
+                functionData.type, baseImage, canUndo, canRedo, overlays.isEmpty(), polygonPointsSize(), selectedOverlay
+            ) {
+                derivedStateOf {
+                    !when (functionData.type) {
+                        FunctionsEnum.REDO -> !canRedo
+                        FunctionsEnum.UNDO -> !canUndo
+                        FunctionsEnum.ADD_LAYER -> overlays.isEmpty()
+                        FunctionsEnum.CLEAR_LAYERS -> polygonPointsSize() == 0
+                        FunctionsEnum.REMOVE_SELECTION -> overlays.isEmpty() || polygonPointsSize() < 3 || selectedOverlay?.material != null
+                        FunctionsEnum.MOVE_TO_FRONT -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(
+                            selectedOverlay
+                        ) == overlays.lastIndex
+
+                        FunctionsEnum.MOVE_TO_BACK -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(
+                            selectedOverlay
+                        ) == 0
+
+                        FunctionsEnum.ROTATE_LEFT, FunctionsEnum.ROTATE_RIGHT -> selectedOverlay == null
+                        else -> baseImage == null
+                    }
+                }
+            }
+
             FunctionItem(
                 data = functionData,
-                canUndo = canUndo,
-                canRedo = canRedo,
-                overlays = overlays,
-                polygonPointsSize = polygonPointsSize,
-                selectedOverlay = selectedOverlay,
-                baseImage = baseImage,
+                enabled = isEnabled,
                 onFunctionClicked = rememberFunctionClicked
             )
         }
-//        item {
-//            VerticalDivider(
-//                Modifier.height(AppButtonSize).padding(vertical = 4.dp).clip(RoundedCornerShape(2.dp)),
-//                thickness = 2.dp,
-//                color = Color.Gray
-//            )
-//        }
-//        items(cursorTypesList, key = { it.type }) { cursorData ->
-//            CursorItem(
-//                data = cursorData,
-//                selectedData = selectedCursor,
-//                baseImage = baseImage,
-//                onCursorClicked = { onCursorClicked(cursorData) }
-//            )
-//        }
     }
 }
 
@@ -105,10 +109,10 @@ fun CursorsMenu(
     modifier: Modifier = Modifier,
     canUndo: Boolean,
     canRedo: Boolean,
+    overlays: ImmutableList<OverlayData>,
+    polygonPointsSize: () -> Int,
+    selectedOverlay: OverlayData?,
     baseImage: ImageBitmap?,
-    overlays: List<OverlayMaterialModel>,
-    polygonPointsSize: Int,
-    selectedOverlay: OverlayMaterialModel?,
     selectedCursor: CursorData?,
     onFunctionClicked: (FunctionData) -> Unit,
     onCursorClicked: (CursorData) -> Unit,
@@ -123,21 +127,41 @@ fun CursorsMenu(
         modifier = modifier.fillMaxHeight()
     ) {
         items(
-            functions,
-            key = { it.type }) { functionData ->
+            items = functions,
+            key = { it.type }
+        ) { functionData ->
 
             val rememberFunctionClicked = remember(functionData) {
                 { onFunctionClicked(functionData) }
             }
 
+            val isEnabled by remember(
+                functionData.type, baseImage, canUndo, canRedo, overlays.isEmpty(), polygonPointsSize(), selectedOverlay
+            ) {
+                derivedStateOf {
+                    !when (functionData.type) {
+                        FunctionsEnum.REDO -> !canRedo
+                        FunctionsEnum.UNDO -> !canUndo
+                        FunctionsEnum.ADD_LAYER -> overlays.isEmpty()
+                        FunctionsEnum.CLEAR_LAYERS -> polygonPointsSize() == 0
+                        FunctionsEnum.REMOVE_SELECTION -> overlays.isEmpty() || polygonPointsSize() < 3 || selectedOverlay?.material != null
+                        FunctionsEnum.MOVE_TO_FRONT -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(
+                            selectedOverlay
+                        ) == overlays.lastIndex
+
+                        FunctionsEnum.MOVE_TO_BACK -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(
+                            selectedOverlay
+                        ) == 0
+
+                        FunctionsEnum.ROTATE_LEFT, FunctionsEnum.ROTATE_RIGHT -> selectedOverlay == null
+                        else -> baseImage == null
+                    }
+                }
+            }
+
             FunctionItem(
                 data = functionData,
-                canUndo = canUndo,
-                canRedo = canRedo,
-                overlays = overlays,
-                polygonPointsSize = polygonPointsSize,
-                selectedOverlay = selectedOverlay,
-                baseImage = baseImage,
+                enabled = isEnabled,
                 onFunctionClicked = rememberFunctionClicked
             )
         }
@@ -145,7 +169,7 @@ fun CursorsMenu(
             CursorItem(
                 data = cursorData,
                 selectedData = selectedCursor,
-                baseImage = baseImage,
+                enabled = baseImage != null,
                 onCursorClicked = onCursorClicked
             )
         }
@@ -156,39 +180,10 @@ fun CursorsMenu(
 @Composable
 fun FunctionItem(
     data: FunctionData,
-    canUndo: Boolean,
-    canRedo: Boolean,
-    overlays: List<OverlayMaterialModel>,
-    polygonPointsSize: Int,
-    selectedOverlay: OverlayMaterialModel?,
-    baseImage: ImageBitmap?,
+    enabled: Boolean,
     onFunctionClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isDisabled by remember(
-        data.type, canUndo, canRedo, overlays, polygonPointsSize, selectedOverlay, baseImage
-    ) {
-        derivedStateOf {
-            when (data.type) {
-                FunctionsEnum.REDO -> !canRedo
-                FunctionsEnum.UNDO -> !canUndo
-                FunctionsEnum.ADD_LAYER -> overlays.isEmpty()
-                FunctionsEnum.CLEAR_LAYERS -> polygonPointsSize == 0
-                FunctionsEnum.REMOVE_SELECTION -> overlays.isEmpty() || polygonPointsSize < 3 || (selectedOverlay != null && selectedOverlay.material != -1)
-                FunctionsEnum.MOVE_TO_FRONT -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(
-                    selectedOverlay
-                ) == overlays.lastIndex
-
-                FunctionsEnum.MOVE_TO_BACK -> selectedOverlay == null || overlays.size < 2 || overlays.indexOf(
-                    selectedOverlay
-                ) == 0
-
-                FunctionsEnum.ROTATE_LEFT, FunctionsEnum.ROTATE_RIGHT -> selectedOverlay == null
-                else -> baseImage == null
-            }
-        }
-    }
-
     Image(
         modifier = modifier
             .size(AppButtonSize)
@@ -197,13 +192,13 @@ fun FunctionItem(
             .clip(shape = RoundedCornerShape(8.dp))
             .background(Color.Gray)
             .border(BorderThickness, Color.White, shape = RoundedCornerShape(8.dp))
-            .noRippleClickable(enabled = !isDisabled, onClick = onFunctionClicked)
+            .noRippleClickable(enabled = enabled, onClick = onFunctionClicked)
             .padding(8.dp),
         contentScale = ContentScale.Crop,
         contentDescription = null,
         colorFilter = ColorFilter.tint(Color.White),
         painter = painterResource(data.img),
-        alpha = if (isDisabled) 0.4f else 1.0f
+        alpha = if (enabled) 1f else 0.4f
     )
 }
 
@@ -211,12 +206,10 @@ fun FunctionItem(
 fun CursorItem(
     data: CursorData,
     selectedData: CursorData?,
-    baseImage: ImageBitmap?,
+    enabled: Boolean,
     onCursorClicked: (CursorData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val enabled by remember(baseImage) { derivedStateOf { baseImage != null } }
-
     Image(
         modifier = modifier
             .size(AppButtonSize)
@@ -225,7 +218,7 @@ fun CursorItem(
             .clip(shape = RoundedCornerShape(8.dp))
             .drawBehind {
                 drawRoundRect(
-                    if (selectedData?.type == data.type && baseImage != null) SelectedItemColor else Color.Gray
+                    if (selectedData?.type == data.type && enabled) SelectedItemColor else Color.Gray
                 )
             }
             .border(BorderThickness, Color.White, shape = RoundedCornerShape(8.dp))
@@ -235,6 +228,6 @@ fun CursorItem(
         contentDescription = null,
         colorFilter = ColorFilter.tint(Color.White),
         painter = painterResource(data.img),
-        alpha = if (enabled) 1.0f else 0.4f
+        alpha = if (enabled) 1f else 0.4f
     )
 }
