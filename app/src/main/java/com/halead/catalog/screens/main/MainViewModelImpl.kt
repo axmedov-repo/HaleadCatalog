@@ -5,9 +5,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.halead.catalog.data.RecentAction
@@ -40,8 +38,6 @@ import com.halead.catalog.utils.isQuadrilateral
 import com.halead.catalog.utils.rotatePoints
 import com.halead.catalog.utils.timber
 import com.halead.catalog.utils.timberE
-import com.halead.catalog.utils.toDp
-import com.halead.catalog.utils.toIntPx
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.collections.immutable.persistentListOf
@@ -50,7 +46,6 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -104,12 +99,9 @@ class MainViewModelImpl @Inject constructor(
     init {
         viewModelScope.launch {
             getMaterials()
-            launch {
-                observeIsMaterialApplied()
-            }
-            launch {
-                saveCurrentState()
-            }
+            launch { observeIsMaterialApplied() }
+            launch { observeToSaveCurrentState() }
+            launch { observePerspectiveChange() }
         }
     }
 
@@ -124,7 +116,7 @@ class MainViewModelImpl @Inject constructor(
                 MainUiEvent.ClearPolygonPoints -> clearPolygonPoints()
                 is MainUiEvent.ExtendPolygonPoints -> extendPolygonPoints(offset = mainUiEvent.offset)
                 is MainUiEvent.InsertPolygonPoint -> insertPolygonPoint(offset = mainUiEvent.offset)
-                MainUiEvent.MemorizeUpdatedPolygonPoints -> memorizeUpdatedPolygonPoints()
+                MainUiEvent.SaveCurrentState -> saveCurrentState()
                 is MainUiEvent.SelectCursor -> selectCursor(cursorData = mainUiEvent.cursorData)
                 is MainUiEvent.SelectFunction -> selectFunction(function = mainUiEvent.function)
                 is MainUiEvent.SelectImage -> selectImage(bitmap = mainUiEvent.bitmap)
@@ -148,80 +140,75 @@ class MainViewModelImpl @Inject constructor(
                     offset = mainUiEvent.offset
                 )
 
-                is MainUiEvent.SaveHeightDiffOfFullScreen -> {
-                    if (!hasHeightDiffMeasured) {
-                        heightDiffFullScreen = mainUiEvent.height
-                        timber("FullScreenIcon", "ViewModel:MainUiEvent.HeightDiff=$heightDiffFullScreen")
-                        hasHeightDiffMeasured = true
-                    }
+                is MainUiEvent.SaveHeightDiffOfFullScreen -> saveHeightDiffOfFullScreen(height = mainUiEvent.height)
+                is MainUiEvent.SaveWidthDiffOfFullScreen -> saveWidthDiffOfFullScreen(width = mainUiEvent.width)
+                is MainUiEvent.SaveEditorSize -> saveEditorSize(size = mainUiEvent.size)
+                is MainUiEvent.SaveEditorFullSize -> saveEditorFullSize(size = mainUiEvent.size)
+                MainUiEvent.OnFullScreenChanged -> onFullScreenChanged()
+            }
+        }
+    }
+
+    private fun saveHeightDiffOfFullScreen(height: Int) {
+        if (!hasHeightDiffMeasured) {
+            heightDiffFullScreen = height
+            timber("FullScreenIcon", "ViewModel:MainUiEvent.HeightDiff=$heightDiffFullScreen")
+            hasHeightDiffMeasured = true
+        }
+    }
+
+    private fun saveWidthDiffOfFullScreen(width: Int) {
+        if (!hasWidthDiffMeasured) {
+            widthDiffFullScreen = width
+            timber("FullScreenIcon", "ViewModel:MainUiEvent.WidthDiff=$widthDiffFullScreen")
+            hasWidthDiffMeasured = true
+        }
+    }
+
+    private fun saveEditorSize(size: IntSize) {
+        if (!hasEditorSizeMeasured) {
+            size.takeIf { it != normalEditorSize }?.let {
+                normalEditorSize = it
+                timber("FullScreenIcon", "ViewModel:MainUiEvent.EditorSize=$normalEditorSize")
+
+                editorScreenState.update { current ->
+                    current.copy(
+                        size = if (current.isFullScreen) fullScreenEditorSize else normalEditorSize
+                    )
                 }
+            }
+            hasEditorSizeMeasured = true
+        }
+    }
 
-                is MainUiEvent.SaveWidthDiffOfFullScreen -> {
-                    if (!hasWidthDiffMeasured) {
-                        widthDiffFullScreen = mainUiEvent.width
-                        timber("FullScreenIcon", "ViewModel:MainUiEvent.WidthDiff=$widthDiffFullScreen")
-                        hasWidthDiffMeasured = true
-                    }
-                }
-
-                is MainUiEvent.SaveEditorSize -> {
-                    if (!hasEditorSizeMeasured) {
-                        mainUiEvent.size.takeIf { it != normalEditorSize }?.let {
-                            normalEditorSize = it
-                            timber("FullScreenIcon", "ViewModel:MainUiEvent.EditorSize=$normalEditorSize")
-
-                            editorScreenState.update { current ->
-                                current.copy(
-                                    size = if (current.isFullScreen) fullScreenEditorSize else normalEditorSize
-                                )
-                            }
-                        }
-                        hasEditorSizeMeasured = true
-                    }
-                }
-
-                is MainUiEvent.SaveEditorFullSize -> {
-                    if (!hasEditorFullSizeMeasured) {
-                        mainUiEvent.size.let { fullSize ->
-                            hasEditorFullSizeMeasured = true
-                            mainUiState
-                                .map { it.imageBmp }
-                                .filterNotNull()
-                                .distinctUntilChanged()
-                                .collect { bmp ->
-                                    val aspectRatio = bmp.width.toFloat() / bmp.height.toFloat()
-                                    val preSize = calculateChildSize(
-                                        fullSize.width - dpToPx(context, 32f),
-                                        fullSize.height - dpToPx(context, 16f),
-                                        aspectRatio
-                                    )
-
-                                    fullScreenEditorSize = preSize
-                                    timber(
-                                        "FullScreenIcon",
-                                        "ViewModel:MainUiEvent.FullscreenSize=$fullScreenEditorSize}"
-                                    )
-
-                                    editorScreenState.update { current ->
-                                        current.copy(
-                                            size = if (current.isFullScreen) fullScreenEditorSize else normalEditorSize
-                                        )
-                                    }
-                                }
-                        }
-                    }
-                }
-
-                MainUiEvent.OnFullScreenChanged -> {
-                    timber("FullScreenIcon", "ViewModel:MainUiEvent.OnFullScreenChanged")
-                    editorScreenState.update { current ->
-                        val newIsFullScreen = !current.isFullScreen
-                        current.copy(
-                            isFullScreen = newIsFullScreen,
-                            size = if (newIsFullScreen) fullScreenEditorSize else normalEditorSize
+    private suspend fun saveEditorFullSize(size: IntSize) = coroutineScope {
+        if (!hasEditorFullSizeMeasured) {
+            size.let { fullSize ->
+                hasEditorFullSizeMeasured = true
+                mainUiState
+                    .map { it.imageBmp }
+                    .filterNotNull()
+                    .distinctUntilChanged()
+                    .collect { bmp ->
+                        val aspectRatio = bmp.width.toFloat() / bmp.height.toFloat()
+                        val preSize = calculateChildSize(
+                            fullSize.width - dpToPx(context, 32f),
+                            fullSize.height - dpToPx(context, 16f),
+                            aspectRatio
                         )
+
+                        fullScreenEditorSize = preSize
+                        timber(
+                            "FullScreenIcon",
+                            "ViewModel:MainUiEvent.FullscreenSize=$fullScreenEditorSize}"
+                        )
+
+                        editorScreenState.update { current ->
+                            current.copy(
+                                size = if (current.isFullScreen) fullScreenEditorSize else normalEditorSize
+                            )
+                        }
                     }
-                }
             }
         }
     }
@@ -239,8 +226,31 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
+    private fun onFullScreenChanged() {
+        timber("FullScreenIcon", "ViewModel:MainUiEvent.OnFullScreenChanged")
+        editorScreenState.update { current ->
+            val newIsFullScreen = !current.isFullScreen
+            current.copy(
+                isFullScreen = newIsFullScreen,
+                size = if (newIsFullScreen) fullScreenEditorSize else normalEditorSize
+            )
+        }
+    }
+
     private suspend fun changePerspective(value: Boolean) = coroutineScope {
         settings.changePerspective(value)
+    }
+
+    private suspend fun observePerspectiveChange() {
+        isPerspectiveEnabled.collect {
+            if (mainUiState.value.currentOverlay != null) {
+                mainUiState.update { uiState ->
+                    uiState.copy(
+                        isMaterialApplied = mainUiState.value.currentOverlay?.hasPerspective == it
+                    )
+                }
+            }
+        }
     }
 
     private suspend fun observeIsMaterialApplied() {
@@ -267,7 +277,7 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
-    private suspend fun saveCurrentState() {
+    private suspend fun observeToSaveCurrentState() {
         mainUiState
             .filter { isRecentActionSavingEnabled }
             .map { it.toTrackedState() }
@@ -814,8 +824,10 @@ class MainViewModelImpl @Inject constructor(
         }
     }
 
-    private fun memorizeUpdatedPolygonPoints() {
+    private fun saveCurrentState() {
         viewModelScope.launch {
+            timber("RecentActionsLog", "Saved Current State")
+            delay(100)  // to avoid state updating race conditions
             isRecentActionSavingEnabled = true
             mainUiState.update { it.copy(trigger = !it.trigger) }
         }
@@ -827,21 +839,43 @@ class MainViewModelImpl @Inject constructor(
         rotationChange: Float
     ) {
         viewModelScope.launch {
+            isRecentActionSavingEnabled = false
             val currentOverlay = mainUiState.value.currentOverlay ?: return@launch
             val overlays = mainUiState.value.overlays.toPersistentList()
-            val newPolygonPoints = async { currentOverlay.polygonPoints.map { it + offsetChange } }
             val overlayIndex = overlays.indexOf(currentOverlay)
+            val center = currentOverlay.polygonCenter
+
+            fun transform(point: Offset): Offset {
+                val relative = point - center
+
+                // Apply scaling
+                val scaled = Offset(relative.x * zoomChange, relative.y * zoomChange)
+
+                // Apply rotation
+                val angleRad = Math.toRadians(rotationChange.toDouble())
+                val rotated = Offset(
+                    (scaled.x * Math.cos(angleRad) - scaled.y * Math.sin(angleRad)).toFloat(),
+                    (scaled.x * Math.sin(angleRad) + scaled.y * Math.cos(angleRad)).toFloat()
+                )
+
+                // Apply translation
+                return rotated + center + offsetChange
+            }
+
+            val newPolygonPoints = currentOverlay.polygonPoints.map(::transform).toImmutableList()
+
             val updatedOverlay = currentOverlay.copy(
-                polygonPoints = newPolygonPoints.await().toImmutableList(),
+                polygonPoints = newPolygonPoints,
                 scale = currentOverlay.scale * zoomChange,
                 rotation = currentOverlay.rotation + rotationChange,
                 offset = currentOverlay.offset + offsetChange,
             )
+
             mainUiState.update {
                 it.copy(
                     overlays = overlays.set(overlayIndex, updatedOverlay),
                     currentOverlay = updatedOverlay,
-                    polygonPoints = newPolygonPoints.await().toImmutableList()
+                    polygonPoints = newPolygonPoints
                 )
             }
         }
@@ -851,7 +885,8 @@ class MainViewModelImpl @Inject constructor(
         var index = overlayIndex
         if (index == null) {
             index = mainUiState.value.overlays.indexOf(mainUiState.value.currentOverlay)
-        } else if (overlayIndex !in mainUiState.value.overlays.indices) return
+        }
+        if (index !in mainUiState.value.overlays.indices) return
 
         viewModelScope.launch {
             isRecentActionSavingEnabled = false

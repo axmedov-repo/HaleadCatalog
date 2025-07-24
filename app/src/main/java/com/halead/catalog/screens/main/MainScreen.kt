@@ -67,14 +67,6 @@ fun MainScreen(
     val perspectiveSwitchValueState by viewModel.isPerspectiveEnabled.collectAsState()
     val editorScreenState by viewModel.editorScreenState.collectAsState()
 
-    LaunchedEffect(uiState.overlays) {
-        timber("OverlaysLog", "${uiState.overlays}")
-    }
-
-    LaunchedEffect(editorScreenState.isFullScreen) {
-        timber("FullScreenIcon", "editorScreenState=$editorScreenState")
-    }
-
     val context = LocalContext.current
     var imageSelectingPurpose by remember { mutableStateOf(ImageSelectingPurpose.EDITING_IMAGE) }
     var showImagePickerDialog by rememberSaveable { mutableStateOf(false) }
@@ -125,17 +117,6 @@ fun MainScreen(
                     viewModel.onUiEvent(MainUiEvent.SaveEditorFullSize(it))
                     timber("FullScreenIcon", "FullScreen size = ${it.width}, ${it.height}")
                 }
-//                .layout { measurable, constraints ->
-//                    val placeable = measurable.measure(constraints)
-//
-//                    viewModel.onUiEvent(MainUiEvent.SaveEditorFullSize(IntSize(placeable.width, placeable.height)))
-//                    timber("FullScreenIcon", "FullScreen size = ${placeable.width}, ${placeable.height}")
-//                    timber("FullScreenIcon", "FullScreen size - 32.dp, 16.dp= ${placeable.width - dpToPx(context, 32f)}, ${placeable.height - dpToPx(context, 16f)}")
-//
-//                    layout(placeable.width, placeable.height) {
-//                        placeable.place(0, 0)
-//                    }
-//                }
         ) {
             Column(
                 modifier = Modifier
@@ -152,15 +133,6 @@ fun MainScreen(
                             .onSizeChanged {
                                 viewModel.onUiEvent(MainUiEvent.SaveHeightDiffOfFullScreen(it.height))
                             },
-//                            .layout { measurable, constraints ->
-//                                val placeable = measurable.measure(constraints)
-//
-//                                viewModel.onUiEvent(MainUiEvent.SaveHeightDiffOfFullScreen(placeable.height))
-//
-//                                layout(placeable.width, placeable.height) {
-//                                    placeable.place(0, 0)
-//                                }
-//                            },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -236,15 +208,6 @@ fun MainScreen(
                         .onSizeChanged {
                             viewModel.onUiEvent(MainUiEvent.SaveWidthDiffOfFullScreen(it.width))
                         },
-//                        .layout { measurable, constraints ->
-//                            val placeable = measurable.measure(constraints)
-//
-//                            viewModel.onUiEvent(MainUiEvent.SaveWidthDiffOfFullScreen(placeable.width))
-//
-//                            layout(placeable.width, placeable.height) {
-//                                placeable.place(0, 0)
-//                            }
-//                        },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {

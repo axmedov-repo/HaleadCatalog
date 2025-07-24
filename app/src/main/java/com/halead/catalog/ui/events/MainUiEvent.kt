@@ -22,7 +22,7 @@ sealed class MainUiEvent {
     data class InsertPolygonPoint(val offset: Offset) : MainUiEvent()
     data class UpdatePolygonPoint(val index: Int, val offset: Offset) : MainUiEvent()
     data class ExtendPolygonPoints(val offset: Offset) : MainUiEvent()
-    data object MemorizeUpdatedPolygonPoints : MainUiEvent()
+    data object SaveCurrentState : MainUiEvent()
     data class UpdateCurrentOverlayPosition(val overlayIndex: Int?, val dragAmount: Offset) : MainUiEvent()
     data object ClearPolygonPoints : MainUiEvent()
     data class BringHistoryWork(val workModel: WorkModel) : MainUiEvent()

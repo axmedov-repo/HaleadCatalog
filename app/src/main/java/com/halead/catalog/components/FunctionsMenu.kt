@@ -72,7 +72,7 @@ fun FunctionsMenu(
             }
 
             val isEnabled by remember(
-                functionData.type, baseImage, canUndo, canRedo, overlays.isEmpty(), polygonPointsSize(), selectedOverlay
+                functionData.type, baseImage, canUndo, canRedo, overlays, polygonPointsSize(), selectedOverlay
             ) {
                 derivedStateOf {
                     !when (functionData.type) {
@@ -136,7 +136,7 @@ fun CursorsMenu(
             }
 
             val isEnabled by remember(
-                functionData.type, baseImage, canUndo, canRedo, overlays.isEmpty(), polygonPointsSize(), selectedOverlay
+                functionData.type, baseImage, canUndo, canRedo, overlays, polygonPointsSize(), selectedOverlay
             ) {
                 derivedStateOf {
                     !when (functionData.type) {

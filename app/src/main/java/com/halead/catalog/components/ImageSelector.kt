@@ -79,17 +79,9 @@ fun ImageSelector(
     var launchersResult by remember { mutableStateOf<Bitmap?>(null) }
     var imageUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
-    LaunchedEffect(overlays) {
-        timber("OverlaysLog", "Selector 1: $overlays")
-    }
-
     val purposeUpdatedState by rememberUpdatedState(purpose)
     val polygonPointsUpdatedState = rememberUpdatedState(polygonPoints)
     val overlaysUpdatedState by rememberUpdatedState(overlays)
-
-    LaunchedEffect(overlaysUpdatedState) {
-        timber("OverlaysLog", "Selector 2: $overlaysUpdatedState")
-    }
 
     LaunchedEffect(Unit) {
         hasCameraPermission = ContextCompat.checkSelfPermission(
@@ -178,15 +170,11 @@ fun ImageSelector(
             }
         }
 
-//        Box(Modifier.size(editorSize().toDpSize()).background(Color.Cyan.copy(0.5f)))
-
         ImagePickerDialog(
             showDialog = showImagePicker,
             hasCurrentImage = imageBmp != null,
             onResetCurrentImage = {
                 timber("calling", "OnResetImage")
-//                launchersResult = null
-//                launchersResult = imageBmp?.asAndroidBitmap()?.let { Bitmap.createBitmap(it) }
                 onMainUiEvent(MainUiEvent.ResetCurrentImage)
                 changeImagePickerVisibility(false)
             },

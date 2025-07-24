@@ -2,16 +2,12 @@ package com.halead.catalog.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -21,8 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,11 +34,13 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
@@ -56,12 +52,10 @@ import com.halead.catalog.data.enums.CursorTypes
 import com.halead.catalog.data.models.OverlayData
 import com.halead.catalog.ui.events.MainUiEvent
 import com.halead.catalog.ui.theme.SelectedItemColor
-import com.halead.catalog.utils.dpToIntPx
 import com.halead.catalog.utils.isPanoramic
 import com.halead.catalog.utils.isPointInPolygon
 import com.halead.catalog.utils.timber
 import com.halead.catalog.utils.toAbsolute
-import com.halead.catalog.utils.toDp
 import com.halead.catalog.utils.toIntPx
 import com.halead.catalog.utils.toRelative
 import kotlinx.collections.immutable.ImmutableList
@@ -104,24 +98,7 @@ fun ImageEditor(
             .padding(8.dp)
             .onSizeChanged {
                 onMainUiEvent(MainUiEvent.SaveEditorSize(it))
-                timber(
-                    "FullScreenIcon",
-                    "ImageEditorSize=${it.width}, ${it.height}"
-                )
             },
-//            .layout { measurable, constraints ->
-//                val placeable = measurable.measure(constraints)
-//                val sizeAfterPadding = IntSize(placeable.width - dpToIntPx(16.dp), placeable.height - dpToIntPx(16.dp))
-//                onMainUiEvent(MainUiEvent.SaveEditorSize(sizeAfterPadding))
-//                timber(
-//                    "FullScreenIcon",
-//                    "currentEditorSize($currentEditorSize)==actualSize(${sizeAfterPadding.width}, ${sizeAfterPadding.height})"
-//                )
-//
-//                layout(placeable.width, placeable.height) {
-//                    placeable.place(0, 0)
-//                }
-//            },
         contentAlignment = Alignment.Center
     ) {
 
@@ -132,30 +109,14 @@ fun ImageEditor(
             modifier = Modifier
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(4.dp))
-                .onSizeChanged {
-                    timber(
-                        "FullScreenIcon",
-                        "ImageSize=${it.width}, ${it.height}"
-                    )
-                }
-//                .layout { measurable, constraints ->
-//                    val placeable = measurable.measure(constraints)
-//
-//                    timber(
-//                        "FullScreenIcon",
-//                        "ImageSize=${placeable.width}, ${placeable.height}"
-//                    )
-//
-//                    layout(placeable.width, placeable.height) {
-//                        placeable.place(0, 0)
-//                    }
-//                }
         )
 
         // Overlays
         Overlays(
             modifier = Modifier.matchParentSize(),
             overlays = editorSizeOverlays,
+            currentCursor = currentCursor,
+            editorSize = editorSize,
             onMainUiEvent = onMainUiEvent
         )
 
@@ -166,177 +127,212 @@ fun ImageEditor(
         Canvas(
             modifier = Modifier
                 .matchParentSize()
-                .onSizeChanged {
-                    timber(
-                        "FullScreenIcon",
-                        "CanvasSize=${it.width}, ${it.height}"
-                    )
-                }
-                .pointerInput(updatedCursor.value, currentEditorSize) {
-                    if (updatedCursor.value.type == CursorTypes.DRAG_PAN) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                val relativeOffset = offset.toRelative(currentEditorSize)
-//                                    CoroutineScope(Dispatchers.Default).launch {
-                                selectedPointIndex = updatedPolygonPoints.value.indexOfFirst { point ->
-                                    (relativeOffset - point).getDistance() <= 32f
-                                }
-                                timber(
-                                    "CustomTransformable",
-                                    " CursorTypes.DRAG_PAN listening $selectedPointIndex"
-                                )
-                                if (selectedPointIndex == -1) {
-                                    return@detectDragGestures
-                                }
-                            },
-                            onDrag = { change, dragAmount ->
-                                if (selectedPointIndex != -1) {
-                                    onMainUiEvent(
-                                        MainUiEvent.UpdatePolygonPoint(
-                                            selectedPointIndex,
-                                            (updatedPolygonPoints.value[selectedPointIndex].toAbsolute(
-                                                currentEditorSize
-                                            ) + Offset(
-                                                dragAmount.x,
-                                                dragAmount.y
-                                            )).toRelative(currentEditorSize)
-                                        )
-                                    )
-                                    change.consume() // Consume the drag event
-                                }
-                            },
-                            onDragEnd = {
-                                if (selectedPointIndex != -1) {
-                                    selectedPointIndex = -1 // Reset selection
-                                    onMainUiEvent(MainUiEvent.MemorizeUpdatedPolygonPoints)
-                                }
-                            }
-                        )
-                    }
-                }
-                .pointerInput(updatedCursor.value, currentEditorSize) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val cursor = updatedCursor.value
-                            val down = awaitFirstDown()
-                            val inputType = down.type
-                            val position = down.position
-
-                            when (cursor.type) {
-                                CursorTypes.DRAW_INSERT -> {
-                                    if (inputType == PointerType.Stylus) {
-                                        onMainUiEvent(
-                                            MainUiEvent.InsertPolygonPoint(
-                                                position.toRelative(
-                                                    currentEditorSize
-                                                )
-                                            )
-                                        )
-                                    } else {
-                                        pointerOffset = position + arrowOffset
-                                        var released = false
-
-                                        while (!released) {
-                                            val event = awaitPointerEvent()
-                                            val change = event.changes.first()
-
-                                            if (change.pressed) {
-                                                pointerOffset = change.position + arrowOffset
-                                            } else if (change.changedToUp()) {
-                                                released = true
-                                                pointerOffset?.let {
-                                                    onMainUiEvent(
-                                                        MainUiEvent.InsertPolygonPoint(
-                                                            it.toRelative(
-                                                                currentEditorSize
-                                                            )
-                                                        )
-                                                    )
-                                                }
-                                                pointerOffset = null
-                                            }
-                                        }
-                                    }
-                                }
-
-                                CursorTypes.DRAW_EXTEND -> {
-                                    if (inputType == PointerType.Stylus) {
-                                        onMainUiEvent(
-                                            MainUiEvent.ExtendPolygonPoints(
-                                                position.toRelative(
-                                                    currentEditorSize
-                                                )
-                                            )
-                                        )
-                                    } else {
-                                        pointerOffset = position + arrowOffset
-                                        var released = false
-
-                                        while (!released) {
-                                            val event = awaitPointerEvent()
-                                            val change = event.changes.first()
-
-                                            if (change.pressed) {
-                                                pointerOffset = change.position + arrowOffset
-                                            } else if (change.changedToUp()) {
-                                                released = true
-                                                pointerOffset?.let {
-                                                    onMainUiEvent(
-                                                        MainUiEvent.ExtendPolygonPoints(
-                                                            it.toRelative(
-                                                                currentEditorSize
-                                                            )
-                                                        )
-                                                    )
-                                                }
-                                                pointerOffset = null
-                                            }
-                                        }
-                                    }
-                                }
-
-                                else -> {}
-                            }
-                        }
-                    }
-                }
                 .then(
                     if (updatedCursor.value.type == CursorTypes.DRAG_PAN) {
-                        Modifier.pointerInput(updatedCursor.value, editorSizeOverlays) {
-                            if (updatedCursor.value.type == CursorTypes.DRAG_PAN) {
-                                detectTapGestures(onTap = { point ->
-                                    for (index in editorSizeOverlays.size - 1 downTo 0) {
-                                        val overlay = editorSizeOverlays[index]
-                                        if (isPointInPolygon(
-                                                point,
-                                                overlay.polygonPoints,
-                                                overlay.holePoints
-                                            )
-                                        ) {
-                                            onMainUiEvent(MainUiEvent.SelectOverlay(overlay))
-                                            return@detectTapGestures
+                        Modifier
+                            .pointerInput(updatedCursor.value, editorSizeOverlays) {
+                                awaitPointerEventScope {
+                                    UpperWhileBlock@ while (true) {
+                                        val baseEvent = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                        val activeTouchCount = baseEvent.changes.count { it.pressed }
+                                        timber("CustomTransformable", "Tap activeTouchCount=$activeTouchCount")
+                                        if (activeTouchCount == 1) {
+                                            // Use a different pass to avoid conflicts with drag handling
+                                            val down = awaitFirstDown()
+
+                                            // Wait for up or cancellation
+                                            val pointerId = down.id
+                                            var up: Boolean
+
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val change = event.changes.firstOrNull { it.id == pointerId } ?: continue
+
+                                                val touchCount = event.changes.count { it.pressed }
+                                                timber("CustomTransformable", "Tap touchCount=$touchCount")
+                                                if (touchCount in 0..1) {
+                                                    if (change.changedToUp()) {
+                                                        up = true
+                                                        break
+                                                    }
+
+                                                    if (!change.pressed) {
+                                                        up = false
+                                                        break
+                                                    }
+                                                } else {
+                                                    continue@UpperWhileBlock
+                                                }
+                                            }
+
+                                            if (up) {
+                                                val position = down.position
+
+                                                // Check if tap is on a polygon point first
+                                                val relativeOffset = position.toRelative(currentEditorSize)
+                                                val index = updatedPolygonPoints.value.indexOfFirst {
+                                                    (relativeOffset - it).getDistance() <= 32f
+                                                }
+
+                                                if (index == -1) {
+                                                    // Only handle overlay selection if not on a polygon point
+                                                    timber("CustomTransformable", "Tap at $position")
+                                                    var hit = false
+                                                    for (overlayIdx in editorSizeOverlays.size - 1 downTo 0) {
+                                                        val overlay = editorSizeOverlays[overlayIdx]
+                                                        if (isPointInPolygon(position, overlay.polygonPoints, overlay.holePoints)
+                                                        ) {
+                                                            val relativeOverlay = overlays()[overlayIdx]
+                                                            onMainUiEvent(MainUiEvent.SelectOverlay(relativeOverlay))
+                                                            hit = true
+                                                            break
+                                                        }
+                                                    }
+
+                                                    if (!hit && updatedPolygonPoints.value.isNotEmpty()) {
+                                                        onMainUiEvent(MainUiEvent.UnselectCurrentOverlay)
+                                                    }
+                                                } else {
+                                                    // Handle point drag
+                                                    // Consume the initial event to prevent other handlers
+                                                    down.consume()
+                                                    selectedPointIndex = index
+                                                    var currentPosition = position
+
+                                                    while (true) {
+                                                        val dragEvent = awaitPointerEvent()
+                                                        val change = dragEvent.changes.first()
+
+                                                        if (change.pressed) {
+                                                            val delta = change.position - currentPosition
+                                                            currentPosition = change.position
+
+                                                            val newAbs =
+                                                                updatedPolygonPoints.value[selectedPointIndex]
+                                                                    .toAbsolute(currentEditorSize) + delta
+
+                                                            onMainUiEvent(
+                                                                MainUiEvent.UpdatePolygonPoint(
+                                                                    selectedPointIndex,
+                                                                    newAbs.toRelative(currentEditorSize)
+                                                                )
+                                                            )
+
+                                                            change.consume()
+                                                        } else if (change.changedToUp()) {
+                                                            selectedPointIndex = -1
+                                                            onMainUiEvent(MainUiEvent.SaveCurrentState)
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
-                                    if (updatedPolygonPoints.value.isNotEmpty()) {
-                                        onMainUiEvent(MainUiEvent.UnselectCurrentOverlay)
+                                }
+                            }
+                            .pointerInteropFilter { false }
+                    } else if (updatedCursor.value.type == CursorTypes.DRAW_INSERT || updatedCursor.value.type == CursorTypes.DRAW_EXTEND) {
+                        Modifier.pointerInput(updatedCursor.value, currentEditorSize) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val cursor = updatedCursor.value
+                                    val down = awaitFirstDown()
+                                    val inputType = down.type
+                                    val position = down.position
+
+                                    when (cursor.type) {
+                                        CursorTypes.DRAW_INSERT -> {
+                                            if (inputType == PointerType.Stylus) {
+                                                onMainUiEvent(
+                                                    MainUiEvent.InsertPolygonPoint(
+                                                        position.toRelative(
+                                                            currentEditorSize
+                                                        )
+                                                    )
+                                                )
+                                            } else {
+                                                pointerOffset = position + arrowOffset
+                                                var released = false
+
+                                                while (!released) {
+                                                    val event = awaitPointerEvent()
+                                                    val change = event.changes.first()
+
+                                                    if (change.pressed) {
+                                                        pointerOffset = change.position + arrowOffset
+                                                    } else if (change.changedToUp()) {
+                                                        released = true
+                                                        pointerOffset?.let {
+                                                            onMainUiEvent(
+                                                                MainUiEvent.InsertPolygonPoint(
+                                                                    it.toRelative(
+                                                                        currentEditorSize
+                                                                    )
+                                                                )
+                                                            )
+                                                        }
+                                                        pointerOffset = null
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        CursorTypes.DRAW_EXTEND -> {
+                                            if (inputType == PointerType.Stylus) {
+                                                onMainUiEvent(
+                                                    MainUiEvent.ExtendPolygonPoints(
+                                                        position.toRelative(
+                                                            currentEditorSize
+                                                        )
+                                                    )
+                                                )
+                                            } else {
+                                                pointerOffset = position + arrowOffset
+                                                var released = false
+
+                                                while (!released) {
+                                                    val event = awaitPointerEvent()
+                                                    val change = event.changes.first()
+
+                                                    if (change.pressed) {
+                                                        pointerOffset = change.position + arrowOffset
+                                                    } else if (change.changedToUp()) {
+                                                        released = true
+                                                        pointerOffset?.let {
+                                                            onMainUiEvent(
+                                                                MainUiEvent.ExtendPolygonPoints(
+                                                                    it.toRelative(
+                                                                        currentEditorSize
+                                                                    )
+                                                                )
+                                                            )
+                                                        }
+                                                        pointerOffset = null
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        else -> {}
                                     }
-                                })
+                                }
                             }
                         }
                     } else Modifier
                 )
         ) {
-            if (updatedPolygonPoints.value.size > 1) {
+            if (polygonPoints().size > 1) {
                 drawLine(
                     color = Color.Green,
-                    start = updatedPolygonPoints.value.last().toAbsolute(currentEditorSize),
-                    end = updatedPolygonPoints.value.first().toAbsolute(currentEditorSize),
+                    start = polygonPoints().last().toAbsolute(currentEditorSize),
+                    end = polygonPoints().first().toAbsolute(currentEditorSize),
                     strokeWidth = 3f
                 )
             }
 
-            if (updatedPolygonPoints.value.size > 2) {
-                updatedPolygonPoints.value.zipWithNext().forEach { (start, end) ->
+            if (polygonPoints().size > 2) {
+                polygonPoints().zipWithNext().forEach { (start, end) ->
                     drawLine(
                         color = Color.Green,
                         start = start.toAbsolute(currentEditorSize),
@@ -346,12 +342,32 @@ fun ImageEditor(
                 }
             }
 
-            if (updatedPolygonPoints.value.isNotEmpty()) {
-                updatedPolygonPoints.value.forEach { point ->
+            if (polygonPoints().isNotEmpty()) {
+                polygonPoints().forEach { point ->
                     drawCircle(color = SelectedItemColor, center = point.toAbsolute(currentEditorSize), radius = 8f)
                 }
             }
         }
+
+        /*Box(
+            Modifier
+                .matchParentSize()
+                .zIndex(1f)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            var index = 0
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            index++
+                            val count = event.changes.count { it.pressed }
+                            if (count in 0..1 && index == 1) continue
+                            fingerCount = count
+                            timber("CustomTransformable", "Global observer: $fingerCount")
+                        }
+                    }
+                }
+                .pointerInteropFilter { false }
+        )*/
 
         Pointer(pointerOffset, modifier = Modifier.matchParentSize())
     }
@@ -378,6 +394,8 @@ private fun Pointer(offset: Offset?, modifier: Modifier = Modifier) {
 @Composable
 private fun Overlays(
     overlays: List<OverlayData>,
+    currentCursor: () -> CursorData,
+    editorSize: () -> IntSize,
     onMainUiEvent: (MainUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -386,7 +404,7 @@ private fun Overlays(
     ) {
         if (overlays.isNotEmpty()) {
             overlays.forEach { overlayData ->
-                Overlay(overlayData)
+                Overlay(overlayData, currentCursor, editorSize, onMainUiEvent)
             }
             LaunchedEffect(overlays) {
                 onMainUiEvent(MainUiEvent.AllOverlaysDrawn)
@@ -402,20 +420,29 @@ private fun Overlays(
 @Composable
 private fun Overlay(
     overlayData: OverlayData,
+    currentCursor: () -> CursorData,
+    editorSize: () -> IntSize,
+    onMainUiEvent: (MainUiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    /*val state =
-                       rememberTransformableState { zoomChange, offsetChange, rotationChange ->
-                           timber("CustomTransformable", "changing")
-                           onMainUiEvent(
-                               MainUiEvent.UpdateCurrentOverlayTransform(
-                                   zoomChange,
-                                   offsetChange.toRelative(editorSize),
-                                   rotationChange
-                               )
-                           )
-                       }*/
-    timber("OVERLAY_DATA", "offset=${overlayData.offset}")
+    val isPanMode = currentCursor().type == CursorTypes.DRAG_PAN
+
+    val allowTransform = remember { mutableStateOf(false) }
+
+    val state = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
+        if (!isPanMode || !allowTransform.value) return@rememberTransformableState
+
+        timber("CustomTransformable", "state changing")
+
+        onMainUiEvent(
+            MainUiEvent.UpdateCurrentOverlayTransform(
+                zoomChange,
+                offsetChange.toRelative(editorSize()),
+                rotationChange
+            )
+        )
+    }
+
     val overlayMaterialBitmap = overlayData.material?.bitmap
 
     if (overlayMaterialBitmap?.isPanoramic() == true) { // TODO: Handle panoramic materials
@@ -430,49 +457,43 @@ private fun Overlay(
             bitmap = overlayData.overlay,
             contentDescription = null,
             modifier = modifier
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            val isValid = event.changes.count { it.pressed } >= 2 && event.changes.none { it.isConsumed }
+                            timber("CustomTransformable", "isValid=$isValid")
+                            if (allowTransform.value != isValid) allowTransform.value = isValid
+                        }
+                    }
+                }
+                .pointerInteropFilter { false }
+                .transformable(state)
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            // Detect if all pointers are up (finger(s) lifted)
+                            if (event.changes.all { it.changedToUpIgnoreConsumed() }) {
+                                // Call your gesture end logic here
+                                onMainUiEvent(MainUiEvent.SaveCurrentState)
+                            }
+                        }
+                    }
+                }
                 .graphicsLayer {
-                    // Apply transformations relative to the center of the overlay
                     val pivotX = overlayData.polygonCenter.x - overlayData.offset.x
                     val pivotY = overlayData.polygonCenter.y - overlayData.offset.y
-
                     translationX = overlayData.offset.x
                     translationY = overlayData.offset.y
-
-                    rotationZ = overlayData.rotation
                     scaleX = overlayData.scale
                     scaleY = overlayData.scale
-
+                    rotationZ = overlayData.rotation
                     transformOrigin = TransformOrigin(
                         pivotX / overlayData.overlay.width,
                         pivotY / overlayData.overlay.height
                     )
-                }
-//                                .clickable { onMainUiEvent(MainUiEvent.SelectOverlay(overlayData)) }
-            /* .pointerInput(currentCursor) {
-                 if (currentCursor.type == CursorTypes.DRAG_PAN) {
-                     detectDragGestures(
-                         onDragStart = {
-                             onMainUiEvent(MainUiEvent.SelectOverlay(overlayData))
-                         },
-                         onDrag = { change, dragAmount ->
-                             CoroutineScope(Dispatchers.Main).launch {
-                                 onMainUiEvent(
-                                     MainUiEvent.UpdateCurrentOverlayPosition(
-                                         overlayIndex = null,
-                                         dragAmount = Offset(dragAmount.x, dragAmount.y)
-                                     )
-                                 )
-                                 change.consume()
-                             }
-                         },
-                         onDragEnd = {
-                             onMainUiEvent(MainUiEvent.MemorizeUpdatedPolygonPoints)
-                         }
-                     )
-                 }
-             }*/
-//                                .transformable(state = state)
-            ,
+                },
             contentScale = ContentScale.None
         )
     }
